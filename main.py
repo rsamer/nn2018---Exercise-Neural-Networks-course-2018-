@@ -21,7 +21,7 @@ def main():
     (X, C1, X_tst, C1_tst) = load_isolet()
 
     X = stats.zscore(X)
-    X_tst = stats.zscore(X)
+    X_tst = stats.zscore(X_tst)
 
     C = create_one_out_of_k_represantation(C1)
     C_tst = create_one_out_of_k_represantation(C1_tst)
@@ -83,6 +83,7 @@ def main():
 
         # Compute the errors over the whole dataset
         train_loss = sess.run(cross_entropy, feed_dict={x: X, z_: C})
+
         test_loss = sess.run(cross_entropy, feed_dict={x: X_tst, z_: C_tst})
 
         # Compute the acc over the whole dataset
@@ -111,6 +112,7 @@ def main():
     ax_list[0].set_ylabel('Cross-entropy')
     ax_list[1].set_ylabel('Accuracy')
     plt.legend(loc=2)
+    plt.show()
 
 
 def create_one_out_of_k_represantation(C1):
