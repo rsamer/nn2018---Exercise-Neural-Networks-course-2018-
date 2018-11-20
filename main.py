@@ -1,8 +1,10 @@
-import tensorflow as tf
+import matplotlib.pyplot as plt
 import numpy as np
 import numpy.random as rd
-import matplotlib.pyplot as plt
+import tensorflow as tf
+import scipy.stats as stats
 from nn18_ex2_load import load_isolet
+
 
 def main():
     # Import dataset and libraries.
@@ -16,8 +18,13 @@ def main():
     # In[3]:
 
     # Give the dimension of the data and chose the number of hidden layer
+    (X, C1, X_tst, C1_tst) = load_isolet()
 
-    (X, C, X_tst, C_tst) = load_isolet()
+    X = stats.zscore(X)
+    X_tst = stats.zscore(X)
+
+    C = create_one_out_of_k_represantation(C1)
+    C_tst = create_one_out_of_k_represantation(C1_tst)
 
     n_in = 300
     n_out = 26
@@ -104,6 +111,15 @@ def main():
     ax_list[0].set_ylabel('Cross-entropy')
     ax_list[1].set_ylabel('Accuracy')
     plt.legend(loc=2)
+
+
+def create_one_out_of_k_represantation(C1):
+    C = np.zeros((C1.shape[0], 26))
+    for i in range(C1.shape[0]):
+        for k in range(0, 25):
+            if k == C1[i]:
+                C[i][k] = 1
+    return C
 
 
 if __name__ == "__main__":
