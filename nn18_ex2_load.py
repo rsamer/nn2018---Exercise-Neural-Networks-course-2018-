@@ -28,5 +28,3 @@ def load_isolet():
   C_tst = isolet_test[1]   # classes C[i] is class of i-th example
 
   return (X, C, X_tst, C_tst)
-  
-  
