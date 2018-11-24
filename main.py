@@ -113,6 +113,7 @@ def main():
                     #---------------------------------------------------------------------------------------------------
                     #
                     #        TODO: @RALPH: review and make sure that the split is really exact and correct!!!!!!!!
+                    #        TODO: use np.array_split(...) instead!
                     #
                     #---------------------------------------------------------------------------------------------------
                     if i == round:
@@ -125,7 +126,7 @@ def main():
                             X_train = X_full_train[start_index:end_index]
                             C_train = C_full_train[start_index:end_index]
 
-                val_acc, val_loss = train_and_evalate(X_train, C_train, X_val, C_val, learning_rate, n_hidden)
+                val_acc, val_loss = train_and_evalate(X_train, C_train, X_val, C_val, X_tst, C_tst, learning_rate, n_hidden)
                 val_acc_list += [val_acc]
                 val_loss_list += [val_loss]
             val_mean = np.mean(val_acc_list)
@@ -136,7 +137,7 @@ def main():
             print(val_std)
 
 
-def train_and_evalate(X_train, C_train, X_val, C_val, learning_rate, n_hidden):
+def train_and_evalate(X_train, C_train, X_val, C_val, X_test, C_test, learning_rate, n_hidden):
     n_in = 300
     n_out = 26
 
@@ -168,6 +169,7 @@ def train_and_evalate(X_train, C_train, X_val, C_val, learning_rate, n_hidden):
     # To evaluate the performance in a readable way, we also compute the classification accuracy.
     correct_prediction = tf.equal(tf.argmax(z, 1), tf.argmax(z_, 1))
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float64))
+    # TODO: this correct_prediction variable tells how many validation samples have been correctly predicted!!!
 
     # Open a session and initialize the variables.
     init = tf.global_variables_initializer()  # Create an op that will
@@ -176,13 +178,18 @@ def train_and_evalate(X_train, C_train, X_val, C_val, learning_rate, n_hidden):
 
     # Re init variables to start from scratch
     sess.run(init)
+    #############################################
+    # TODO: WHY IS THIS DONE TWICE???????????????
+    # TODO: WHY IS THIS DONE TWICE???????????????
+    # TODO: WHY IS THIS DONE TWICE???????????????
+    #############################################
 
     # Create some list to monitor how error decreases
-    #test_loss_list = []
+    test_loss_list = []
     val_loss_list = []
     train_loss_list = []
 
-    #test_acc_list = []
+    test_acc_list = []
     val_acc_list = []
     train_acc_list = []
 
@@ -206,11 +213,17 @@ def train_and_evalate(X_train, C_train, X_val, C_val, learning_rate, n_hidden):
         # Compute the errors over the whole dataset
         train_loss = sess.run(cross_entropy, feed_dict={x_input: X_train, z_: C_train})
         val_loss = sess.run(cross_entropy, feed_dict={x_input: X_val, z_: C_val})
-        #test_loss = sess.run(cross_entropy, feed_dict={x_input: X_tst, z_: C_tst})
+        test_loss = sess.run(cross_entropy, feed_dict={x_input: X_test, z_: C_test})
 
         # ----------------------------------------------------------------------------------------------------------
         # early stopping check BEGIN
         # ----------------------------------------------------------------------------------------------------------
+        # FIXME: VERY IMPORTANT!!! Change early stopping strategy as the professor told us in the lecture!!!
+        #                          Although the current strategy is okay too, the professor's strategy is better!!!
+        # FIXME: VERY IMPORTANT!!! Change early stopping strategy as the professor told us in the lecture!!!
+        #                          Although the current strategy is okay too, the professor's strategy is better!!!
+        # FIXME: VERY IMPORTANT!!! Change early stopping strategy as the professor told us in the lecture!!!
+        #                          Although the current strategy is okay too, the professor's strategy is better!!!
         if val_loss <= val_loss_min:
             val_loss_min = val_loss
             num_of_iterations_where_val_loss_increased_after_minimum = 0
@@ -227,13 +240,13 @@ def train_and_evalate(X_train, C_train, X_val, C_val, learning_rate, n_hidden):
         # Compute the acc over the whole dataset
         train_acc = sess.run(accuracy, feed_dict={x_input: X_train, z_: C_train})
         val_acc = sess.run(accuracy, feed_dict={x_input: X_val, z_: C_val})
-        #test_acc = sess.run(accuracy, feed_dict={x_input: X_tst, z_: C_tst})
+        test_acc = sess.run(accuracy, feed_dict={x_input: X_test, z_: C_test})
 
         # Put it into the lists
-        #test_loss_list.append(test_loss)
+        test_loss_list.append(test_loss)
         val_loss_list.append(val_loss)
         train_loss_list.append(train_loss)
-        #test_acc_list.append(test_acc)
+        test_acc_list.append(test_acc)
         val_acc_list.append(val_acc)
         train_acc_list.append(train_acc)
 
@@ -253,10 +266,10 @@ def train_and_evalate(X_train, C_train, X_val, C_val, learning_rate, n_hidden):
     fig, ax_list = plt.subplots(1, 2)
     ax_list[0].plot(train_loss_list, color='blue', label='training', lw=2)
     ax_list[0].plot(val_loss_list, color='green', label='validation', lw=2)
-    #ax_list[0].plot(test_loss_list, color='green', label='testing', lw=2)
+    ax_list[0].plot(test_loss_list, color='red', label='testing', lw=2)
     ax_list[1].plot(train_acc_list, color='blue', label='training', lw=2)
     ax_list[1].plot(val_acc_list, color='green', label='validation', lw=2)
-    #ax_list[1].plot(test_acc_list, color='green', label='testing', lw=2)
+    ax_list[1].plot(test_acc_list, color='red', label='testing', lw=2)
 
     ax_list[0].set_xlabel('training iterations')
     ax_list[1].set_xlabel('training iterations')
