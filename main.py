@@ -70,7 +70,7 @@ def main():
     X_full_train = np.array(list(map(lambda s: s[0], shuffled_samples_and_labels)))
     C_full_train = np.array(list(map(lambda s: s[1], shuffled_samples_and_labels)))
 
-    k = 3
+    k = 20
     val_acc_list, val_loss_list = [], []
 
     #for learning_rate in [0.05, 0.1, 0.5]:
@@ -89,6 +89,13 @@ def main():
             #(104, 104, 104)   # 3 hidden layers (hiddenLayer1: 104 neurons, hiddenLayer2: 104 neurons, hiddenLayer3: 104 neurons)
         ]:
             for round in range(k):
+
+                # FIXME: fix this!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                # FIXME: fix this!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                # FIXME: fix this!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                if round == k - 1:
+                    break
+
                 ########################################################################################################
                 # NOTE: *Stratified* k-fold CV does NOT need to be applied here.                                       #
                 #       Normal k-fold CV is sufficient since all labels are already almost equally distributed         #
