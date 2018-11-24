@@ -4,6 +4,7 @@ import numpy.random as rd
 import tensorflow as tf
 from nn18_ex2_load import load_isolet
 import itertools
+import random
 
 
 def compute_label_frequencies(C1):
@@ -62,28 +63,36 @@ def main():
     import sys;sys.exit()
     """
 
-    X_full_train, C_full_train = X, C
-    k = 5
+    # fixed seed 42 to generate reproduceable results
+    rstate = np.random.RandomState(42)
+    shuffled_samples_and_labels = list(zip(X, C))
+    rstate.shuffle(shuffled_samples_and_labels)
+    X_full_train = np.array(list(map(lambda s: s[0], shuffled_samples_and_labels)))
+    C_full_train = np.array(list(map(lambda s: s[1], shuffled_samples_and_labels)))
+
+    k = 3
     val_acc_list, val_loss_list = [], []
 
     #for learning_rate in [0.05, 0.1, 0.5]:
     for learning_rate in [0.1]:
+        # here you can easily specify how many hidden layers the network should have as well as how many neurons the hidden layers should have
         for n_hidden in [
-            (52,),
-            #(52, 52),
-            (104, 52),
-            (104, 52, 32),
-            #(208, 52),
-            #(52, 26, 26),
-            #(104, 104),
-            #(208, 208),
-            #(52, 52, 52),
-            #(104, 104, 104),
+            (52,),            # 1 hidden layer  (hiddenLayer1: 52 neurons)
+            (104, 52),        # 2 hidden layers (hiddenLayer1: 104 neurons, hiddenLayer2: 52 neurons)
+            (208, 104, 52),   # 3 hidden layers (hiddenLayer1: 208 neurons, hiddenLayer2: 104 neurons, hiddenLayer3: 52 neurons)
+            #(104, 52, 32),    # 3 hidden layers (hiddenLayer1: 104 neurons, hiddenLayer2: 52 neurons, hiddenLayer3: 32 neurons)
+            #(208, 52),        # 2 hidden layers (hiddenLayer1: 208 neurons, hiddenLayer2: 52 neurons)
+            #(52, 26, 26),     # 3 hidden layers (hiddenLayer1: 52 neurons, hiddenLayer2: 26 neurons, hiddenLayer3: 26 neurons)
+            #(104, 104),       # 2 hidden layers (hiddenLayer1: 104 neurons, hiddenLayer2: 104 neurons)
+            #(208, 208),       # 2 hidden layers (hiddenLayer1: 208 neurons, hiddenLayer2: 208 neurons)
+            #(52, 52, 52),     # 3 hidden layers (hiddenLayer1: 52 neurons, hiddenLayer2: 52 neurons, hiddenLayer3: 52 neurons)
+            #(104, 104, 104)   # 3 hidden layers (hiddenLayer1: 104 neurons, hiddenLayer2: 104 neurons, hiddenLayer3: 104 neurons)
         ]:
             for round in range(k):
-                ############################
-                # FIXME: NOT stratified!!  #
-                ############################
+                ########################################################################################################
+                # NOTE: *Stratified* k-fold CV does NOT need to be applied here.                                       #
+                #       Normal k-fold CV is sufficient since all labels are already almost equally distributed         #
+                ########################################################################################################
                 n_train_samples = len(X_full_train)
                 n_fold_samples = int(n_train_samples / k)
                 n_last_fold_samples = n_train_samples - (n_fold_samples * (k - 1))
@@ -94,6 +103,11 @@ def main():
                     start_index = i * n_current_fold_samples
                     end_index = start_index + n_current_fold_samples
                     print("{}-{}".format(start_index, end_index))
+                    #---------------------------------------------------------------------------------------------------
+                    #
+                    #        TODO: @RALPH: review and make sure that the split is really exact and correct!!!!!!!!
+                    #
+                    #---------------------------------------------------------------------------------------------------
                     if i == round:
                         X_val, C_val = X_full_train[start_index:end_index], C_full_train[start_index:end_index]
                     else:
