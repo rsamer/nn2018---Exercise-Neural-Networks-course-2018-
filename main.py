@@ -6,6 +6,15 @@ from nn18_ex2_load import load_isolet
 import itertools
 
 
+def compute_label_frequencies(C1):
+    frequencies = {}
+    for i, val in enumerate(C1):
+        if val not in frequencies:
+            frequencies[val] = 0
+        frequencies[val] += 1
+    return frequencies
+
+
 def normalize(X, mns=None, sstd=None):
     '''
     based on scipy.stats.stats.zscore
@@ -34,8 +43,24 @@ def main():
     X, mns, sstd = normalize(X)
     X_tst, _, _ = normalize(X_tst, mns, sstd)
 
+    print('-' * 80)
+    print(X.shape)
+    print(C1.shape)
+    print(X_tst.shape)
+    print(C1_tst.shape)
+    print(compute_label_frequencies(C1))
+    print(compute_label_frequencies(C1_tst))
+
     C = create_one_out_of_k_represantation(C1)
     C_tst = create_one_out_of_k_represantation(C1_tst)
+    print(C.shape)
+    print(C_tst.shape)
+    """
+    print(C1[40:60])
+    print(C[40:60])
+    print('-' * 80)
+    import sys;sys.exit()
+    """
 
     X_full_train, C_full_train = X, C
     k = 5
@@ -224,9 +249,17 @@ def train_and_evalate(X_train, C_train, X_val, C_val, learning_rate, n_hidden):
 def create_one_out_of_k_represantation(C1):
     C = np.zeros((C1.shape[0], 26))
     for i in range(C1.shape[0]):
-        for k in range(0, 25):
-            if k == C1[i]:
+        reached = False
+        for k in range(0, 26):
+            if k == (C1[i] - 1):
+                #print(k)
                 C[i][k] = 1
+                reached = True
+        if reached is False:
+            print('WHY!?!? {}'.format(C1[i]))
+            import sys;sys.exit()
+    for one_hot_label_vector in C:
+        assert(np.sum(one_hot_label_vector) == 1.0, "Invalid label vector!")
     return C
 
 
