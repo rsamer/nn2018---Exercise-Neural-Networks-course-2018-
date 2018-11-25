@@ -47,10 +47,14 @@ def print_training_result_summary(tr, is_final_validation_report=False, is_final
     if not is_final_training:
         early_stopping_val_acc = tr.val_acc_list[tr.early_stopping_epoch_number - 1]
         early_stopping_val_loss = tr.val_loss_list[tr.early_stopping_epoch_number - 1]
+        early_stopping_train_acc = tr.train_acc_list[tr.early_stopping_epoch_number - 1]
+        early_stopping_train_loss = tr.train_loss_list[tr.early_stopping_epoch_number - 1]
         misclassification_rate = 1 - early_stopping_val_acc
         if not is_final_validation_report:
             print('*** Early stopping ***')
         print('  best iteration number: {}'.format(tr.early_stopping_epoch_number))
+        print('  training loss: {:.3f}'.format(early_stopping_train_loss))
+        print('  training accuracy: {:.3f}'.format(early_stopping_train_acc))
         print('  validation loss: {:.3f}'.format(early_stopping_val_loss))
         print('  validation accuracy: {:.3f}'.format(early_stopping_val_acc))
         print("  validation misclassification rate: {:.3f}".format(misclassification_rate))
@@ -58,9 +62,13 @@ def print_training_result_summary(tr, is_final_validation_report=False, is_final
         assert(not is_final_validation_report)
         early_stopping_test_acc = tr.test_acc_list[tr.early_stopping_epoch_number - 1]
         early_stopping_test_loss = tr.test_loss_list[tr.early_stopping_epoch_number - 1]
+        early_stopping_train_acc = tr.train_acc_list[tr.early_stopping_epoch_number - 1]
+        early_stopping_train_loss = tr.train_loss_list[tr.early_stopping_epoch_number - 1]
         misclassification_rate = 1 - early_stopping_test_acc
         print('*** Final training result ***')
         print('  best iteration number: {}'.format(tr.early_stopping_epoch_number))
+        print('  training loss: {:.3f}'.format(early_stopping_train_loss))
+        print('  training accuracy: {:.3f}'.format(early_stopping_train_acc))
         print('  test loss: {:.3f}'.format(early_stopping_test_loss))
         print('  test accuracy: {:.3f}'.format(early_stopping_test_acc))
         print("  test misclassification rate: {:.3f}".format(misclassification_rate))
