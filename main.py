@@ -105,12 +105,13 @@ def main():
 
     # here you can specify how many hidden layers the network should have as well as how many neurons the hidden layers should have
     CONFIG_VALIDATION_ARCHITECTURE = [
-        #(50,),            # 1 hidden layer  (hiddenLayer1: 50 neurons)
-        #(100,),           # 1 hidden layer  (hiddenLayer1: 100 neurons)
-        #(100, 50),        # 2 hidden layers (hiddenLayer1: 100 neurons, hiddenLayer2: 50 neurons)
-        (300, 100),       # 2 hidden layers (hiddenLayer1: 100 neurons, hiddenLayer2: 50 neurons)
-        #(200, 100, 50),   # 3 hidden layers (hiddenLayer1: 200 neurons, hiddenLayer2: 100 neurons, hiddenLayer3: 50 neurons)
-        #(300, 100, 50),   # 3 hidden layers (hiddenLayer1: 300 neurons, hiddenLayer2: 100 neurons, hiddenLayer3: 50 neurons)
+        (50,),            # 1 hidden layer  (hiddenLayer1: 50 neurons)
+        (130,),           # 1 hidden layer  (hiddenLayer1: 130 neurons)
+        (300, 100),       # 2 hidden layers (hiddenLayer1: 300 neurons, hiddenLayer2: 100 neurons)
+        (300, 150),       # 2 hidden layers (hiddenLayer1: 300 neurons, hiddenLayer2: 150 neurons)
+        (300, 80),        # 2 hidden layers (hiddenLayer1: 300 neurons, hiddenLayer2: 50 neurons)
+        (200, 100, 50),   # 3 hidden layers (hiddenLayer1: 200 neurons, hiddenLayer2: 100 neurons, hiddenLayer3: 50 neurons)
+        (300, 100, 50),   # 3 hidden layers (hiddenLayer1: 300 neurons, hiddenLayer2: 100 neurons, hiddenLayer3: 50 neurons)
     ]
     ####################################################################################################################
 
