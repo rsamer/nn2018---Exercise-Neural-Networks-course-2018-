@@ -47,23 +47,23 @@ def print_training_result_summary(tr, is_final_validation_report=False, is_final
     if not is_final_training:
         early_stopping_val_acc = tr.val_acc_list[tr.early_stopping_epoch_number - 1]
         early_stopping_val_loss = tr.val_loss_list[tr.early_stopping_epoch_number - 1]
-        missclassification_rate = 1 - early_stopping_val_acc
+        misclassification_rate = 1 - early_stopping_val_acc
         if not is_final_validation_report:
             print('*** Early stopping ***')
         print('  best iteration number: {}'.format(tr.early_stopping_epoch_number))
         print('  validation loss: {:.3f}'.format(early_stopping_val_loss))
         print('  validation accuracy: {:.3f}'.format(early_stopping_val_acc))
-        print("  validation missclassification rate: {:.3f}".format(missclassification_rate))
+        print("  validation misclassification rate: {:.3f}".format(misclassification_rate))
     else:
         assert(not is_final_validation_report)
         early_stopping_test_acc = tr.test_acc_list[tr.early_stopping_epoch_number - 1]
         early_stopping_test_loss = tr.test_loss_list[tr.early_stopping_epoch_number - 1]
-        missclassification_rate = 1 - early_stopping_test_acc
+        misclassification_rate = 1 - early_stopping_test_acc
         print('*** Final training result ***')
         print('  best iteration number: {}'.format(tr.early_stopping_epoch_number))
         print('  test loss: {:.3f}'.format(early_stopping_test_loss))
         print('  test accuracy: {:.3f}'.format(early_stopping_test_acc))
-        print("  test missclassification rate: {:.3f}".format(missclassification_rate))
+        print("  test misclassification rate: {:.3f}".format(misclassification_rate))
     print()
 
 
@@ -92,7 +92,7 @@ def main():
     CONFIG_VALIDATION_NUM_OF_TOTAL_TRAIN_EPOCHS = 200
 
     # number of total iterations for final training
-    # Note: Although the missclassification error is measured at the epoch which was determined during the
+    # Note: Although the misclassification error is measured at the epoch which was determined during the
     #       validation phase via early-stopping, the training is continued for the purpose of plotting.
     CONFIG_FINAL_TRAINING_NUM_OF_TOTAL_TRAIN_EPOCHS = 200
 
@@ -154,7 +154,7 @@ def main():
 
     assert (len(X_full_train) == len(C_full_train))
     best_training_result = None
-    best_training_missclassification_rate = None
+    best_training_misclassification_rate = None
     best_learning_rate = 0.0
     best_architecture = None
 
@@ -223,21 +223,21 @@ def main():
 
                 tr = train_and_evaluate(X_train, C_train, X_val, C_val, X_tst, C_tst, learning_rate,
                                         n_hidden, n_iter=CONFIG_VALIDATION_NUM_OF_TOTAL_TRAIN_EPOCHS)
-                missclassification_rate = 1 - tr.val_acc_list[tr.early_stopping_epoch_number - 1]
+                misclassification_rate = 1 - tr.val_acc_list[tr.early_stopping_epoch_number - 1]
                 print_training_result_summary(tr)
                 plot_errors_and_accuracies(plot_title, tr.train_loss_list, tr.train_acc_list,
                                            tr.val_loss_list, tr.val_acc_list,
                                            tr.test_loss_list if CONFIG_VALIDATION_PLOT_TEST_ERROR else None,
                                            tr.test_acc_list if CONFIG_VALIDATION_PLOT_TEST_ERROR else None,
                                            tr.early_stopping_epoch_number)
-                if best_training_missclassification_rate is None or missclassification_rate < best_training_missclassification_rate:
+                if best_training_misclassification_rate is None or misclassification_rate < best_training_misclassification_rate:
                     best_training_result = tr
-                    best_training_missclassification_rate = missclassification_rate
+                    best_training_misclassification_rate = misclassification_rate
                     best_learning_rate = learning_rate
                     best_architecture = n_hidden
 
     # c) retrain with full training data set and best parameters
-    if best_training_missclassification_rate is not None:
+    if best_training_misclassification_rate is not None:
         print()
         print('-' * 80)
         print("*** Summary of best model (during validation phase) ***")
@@ -420,7 +420,7 @@ def plot_errors_and_accuracies(title, train_loss_list, train_acc_list, val_loss_
     if test_loss_list is not None:
         ax_list[0].plot(test_loss_list, color='red', label='testing', lw=2)
 
-    # missclassification rate plot
+    # misclassification rate plot
     train_mcr_list = np.subtract(np.ones(len(train_acc_list), dtype=np.float64), train_acc_list)
     ax_list[1].plot(train_mcr_list, color='blue', label='training', lw=2)
 
@@ -446,7 +446,7 @@ def plot_errors_and_accuracies(title, train_loss_list, train_acc_list, val_loss_
     ax_list[0].set_xlabel('training iterations')
     ax_list[1].set_xlabel('training iterations')
     ax_list[0].set_ylabel('Cross-entropy')
-    ax_list[1].set_ylabel('Missclassification rate')
+    ax_list[1].set_ylabel('Misclassification rate')
     #ax_list[1].set_ylabel('Accuracy')
 
     # shows vertical line where early stopping occurred...
