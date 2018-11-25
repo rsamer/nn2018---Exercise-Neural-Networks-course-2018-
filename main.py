@@ -42,6 +42,31 @@ def normalize(X, mns=None, sstd=None):
     return normalized_X, mns, sstd
 
 
+def print_training_result_summary(tr, is_final_validation_report=False, is_final_training=False):
+    print()
+    if not is_final_training:
+        early_stopping_val_acc = tr.val_acc_list[tr.early_stopping_epoch_number - 1]
+        early_stopping_val_loss = tr.val_loss_list[tr.early_stopping_epoch_number - 1]
+        missclassification_rate = 1 - early_stopping_val_acc
+        if not is_final_validation_report:
+            print('*** Early stopping ***')
+        print('  best iteration number: {}'.format(tr.early_stopping_epoch_number))
+        print('  validation loss: {:.3f}'.format(early_stopping_val_loss))
+        print('  validation accuracy: {:.3f}'.format(early_stopping_val_acc))
+        print("  validation missclassification rate: {:.3f}".format(missclassification_rate))
+    else:
+        assert(not is_final_validation_report)
+        early_stopping_test_acc = tr.test_acc_list[tr.early_stopping_epoch_number - 1]
+        early_stopping_test_loss = tr.test_loss_list[tr.early_stopping_epoch_number - 1]
+        missclassification_rate = 1 - early_stopping_test_acc
+        print('*** Final training result ***')
+        print('  best iteration number: {}'.format(tr.early_stopping_epoch_number))
+        print('  test loss: {:.3f}'.format(early_stopping_test_loss))
+        print('  test accuracy: {:.3f}'.format(early_stopping_test_acc))
+        print("  test missclassification rate: {:.3f}".format(missclassification_rate))
+    print()
+
+
 def main():
     ####################################################################################################################
     # Set configuration parameters here!                                                                               #
@@ -80,16 +105,12 @@ def main():
 
     # here you can specify how many hidden layers the network should have as well as how many neurons the hidden layers should have
     CONFIG_VALIDATION_ARCHITECTURE = [
-        (52,),            # 1 hidden layer  (hiddenLayer1: 52 neurons)
-        (104, 52),        # 2 hidden layers (hiddenLayer1: 104 neurons, hiddenLayer2: 52 neurons)
-        (208, 104, 52),   # 3 hidden layers (hiddenLayer1: 208 neurons, hiddenLayer2: 104 neurons, hiddenLayer3: 52 neurons)
-        #(104, 52, 32),    # 3 hidden layers (hiddenLayer1: 104 neurons, hiddenLayer2: 52 neurons, hiddenLayer3: 32 neurons)
-        #(208, 52),        # 2 hidden layers (hiddenLayer1: 208 neurons, hiddenLayer2: 52 neurons)
-        #(52, 26, 26),     # 3 hidden layers (hiddenLayer1: 52 neurons, hiddenLayer2: 26 neurons, hiddenLayer3: 26 neurons)
-        #(104, 104),       # 2 hidden layers (hiddenLayer1: 104 neurons, hiddenLayer2: 104 neurons)
-        #(208, 208),       # 2 hidden layers (hiddenLayer1: 208 neurons, hiddenLayer2: 208 neurons)
-        #(52, 52, 52),     # 3 hidden layers (hiddenLayer1: 52 neurons, hiddenLayer2: 52 neurons, hiddenLayer3: 52 neurons)
-        #(104, 104, 104)   # 3 hidden layers (hiddenLayer1: 104 neurons, hiddenLayer2: 104 neurons, hiddenLayer3: 104 neurons)
+        #(50,),            # 1 hidden layer  (hiddenLayer1: 50 neurons)
+        #(100,),           # 1 hidden layer  (hiddenLayer1: 100 neurons)
+        #(100, 50),        # 2 hidden layers (hiddenLayer1: 100 neurons, hiddenLayer2: 50 neurons)
+        (300, 100),       # 2 hidden layers (hiddenLayer1: 100 neurons, hiddenLayer2: 50 neurons)
+        #(200, 100, 50),   # 3 hidden layers (hiddenLayer1: 200 neurons, hiddenLayer2: 100 neurons, hiddenLayer3: 50 neurons)
+        #(300, 100, 50),   # 3 hidden layers (hiddenLayer1: 300 neurons, hiddenLayer2: 100 neurons, hiddenLayer3: 50 neurons)
     ]
     ####################################################################################################################
 
@@ -137,12 +158,15 @@ def main():
     best_architecture = None
 
     # b) train, meta-parameter search, and validate
+    print()
+    print("=" * 80)
+    print()
     print('b) train, meta-parameter search, and validate')
     for learning_rate in CONFIG_VALIDATION_LEARNING_RATES:
         for n_hidden in CONFIG_VALIDATION_ARCHITECTURE:
             print()
             print("-" * 80)
-            print("LearningRate={}, Architecture={}".format(learning_rate, n_hidden))
+            print("   LearningRate={}, Architecture={}".format(learning_rate, n_hidden))
             print("-" * 80)
             plot_title = "Validation - Learn. rate: {:.2f}, {} hidden layer{} (Neurons: {})".format(learning_rate, len(n_hidden),
                                                                                          "s" if len(n_hidden) != 1 else "",
@@ -180,9 +204,7 @@ def main():
                     early_stopping_val_loss = tr.val_loss_list[tr.early_stopping_epoch_number - 1]
                     val_acc_list += [early_stopping_val_acc]
                     val_loss_list += [early_stopping_val_loss]
-                    print('best iteration number according to early stopping is: {}'.format(tr.early_stopping_epoch_number))
-                    print('validation accuracy was: {:.3f}'.format(early_stopping_val_acc))
-                    print('validation loss was: {:.3f}'.format(early_stopping_val_loss))
+                    print_training_result_summary(tr)
                     plot_errors_and_accuracies(plot_title, tr.train_loss_list, tr.train_acc_list,
                                                tr.val_loss_list, tr.val_acc_list,
                                                tr.test_loss_list if CONFIG_VALIDATION_PLOT_TEST_ERROR else None,
@@ -200,13 +222,8 @@ def main():
 
                 tr = train_and_evaluate(X_train, C_train, X_val, C_val, X_tst, C_tst, learning_rate,
                                         n_hidden, n_iter=CONFIG_VALIDATION_NUM_OF_TOTAL_TRAIN_EPOCHS)
-                early_stopping_val_acc = tr.val_acc_list[tr.early_stopping_epoch_number - 1]
-                early_stopping_val_loss = tr.val_loss_list[tr.early_stopping_epoch_number - 1]
-                missclassification_rate = 1 - early_stopping_val_acc
-                print('best iteration number according to early stopping is: {}'.format(tr.early_stopping_epoch_number))
-                print('validation accuracy was: {:.3f}'.format(early_stopping_val_acc))
-                print('validation loss was: {:.3f}'.format(early_stopping_val_loss))
-                print("Accuracy: {:.3f}".format(early_stopping_val_acc))
+                missclassification_rate = 1 - tr.val_acc_list[tr.early_stopping_epoch_number - 1]
+                print_training_result_summary(tr)
                 plot_errors_and_accuracies(plot_title, tr.train_loss_list, tr.train_acc_list,
                                            tr.val_loss_list, tr.val_acc_list,
                                            tr.test_loss_list if CONFIG_VALIDATION_PLOT_TEST_ERROR else None,
@@ -220,8 +237,16 @@ def main():
 
     # c) retrain with full training data set and best parameters
     if best_training_missclassification_rate is not None:
+        print()
+        print('-' * 80)
+        print("*** Summary of best model (during validation phase) ***")
+        print("   LearningRate={}, Fixed Architecture={}".format(best_learning_rate, best_architecture))
+        print("   Early stopping: number_of_epochs={}".format(best_training_result.early_stopping_epoch_number))
+        print_training_result_summary(best_training_result)
+        print()
+        print("=" * 80)
+        print()
         print('c) retrain with full training data set and best parameters')
-        print("-" * 80)
         print("   LearningRate={}, Fixed Architecture={}".format(best_learning_rate, best_architecture))
         print("-" * 80)
         plot_title = "Final Training - Learn. rate: {:.2f}, {} hidden layer{} (Neurons: {})".format(
@@ -229,10 +254,13 @@ def main():
             "s" if len(best_architecture) != 1 else "",
             ", ".join(map(str, best_architecture)))
 
+        expected_epoch_number = best_training_result.early_stopping_epoch_number
         tr = train_and_evaluate(X_full_train, C_full_train, None, None, X_tst, C_tst,
                                 best_learning_rate, best_architecture,
                                 n_iter=CONFIG_FINAL_TRAINING_NUM_OF_TOTAL_TRAIN_EPOCHS,
                                 best_training_result=best_training_result)
+        assert expected_epoch_number == tr.early_stopping_epoch_number
+        print_training_result_summary(tr, is_final_training=True)
         plot_errors_and_accuracies(plot_title, tr.train_loss_list, tr.train_acc_list, None, None, tr.test_loss_list,
                                    tr.test_acc_list, tr.early_stopping_epoch_number)
 
@@ -251,7 +279,7 @@ def train_and_evaluate(X_train, C_train, X_val, C_val, X_test, C_test, learning_
         n_previous = n_current_hidden
 
     w_out = tf.Variable(rd.randn(n_previous, n_out) / np.sqrt(n_in), trainable=True)
-    b_out = tf.Variable(np.zeros(n_out))
+    b_out = tf.Variable(np.zeros(n_out), trainable=True)
 
     # Define the neuron operations
     x_current = x_input = tf.placeholder(shape=(None, n_in), dtype=tf.float64)
@@ -337,8 +365,10 @@ def train_and_evaluate(X_train, C_train, X_val, C_val, X_test, C_test, learning_
 
         if X_val is not None:
             # ----------------------------------------------------------------------------------------------------------
-            # early stopping check BEGIN
+            # case 1: training during validation phase
             # ----------------------------------------------------------------------------------------------------------
+
+            # early stopping check BEGIN
             if best_training_result is None:
                 if val_loss <= early_stopping_val_loss_min:
                     early_stopping_epoch_number = iteration_idx + 1
@@ -346,13 +376,13 @@ def train_and_evaluate(X_train, C_train, X_val, C_val, X_test, C_test, learning_
             else:
                 if iteration_idx == (best_training_result.early_stopping_epoch_number - 1):
                     early_stopping_val_loss_min = val_loss
-            # ----------------------------------------------------------------------------------------------------------
-            # early stopping check END
-            # ----------------------------------------------------------------------------------------------------------
 
             if np.mod(iteration_idx, 10) == 0:
                 print('iteration {} validation accuracy: {:.3f}'.format(iteration_idx + 1, val_acc))
         else:
+            # ----------------------------------------------------------------------------------------------------------
+            # case 2: final training during testing phase
+            # ----------------------------------------------------------------------------------------------------------
             assert(best_training_result is not None)
             if iteration_idx == (best_training_result.early_stopping_epoch_number - 1):
                 early_stopping_val_loss_min = test_loss
@@ -420,12 +450,12 @@ def plot_errors_and_accuracies(title, train_loss_list, train_acc_list, val_loss_
 
     # shows vertical line where early stopping occurred...
     if early_stopping_epoch_number is not None:
-        ax_list[0].axvline(x=early_stopping_epoch_number)
-        ax_list[1].axvline(x=early_stopping_epoch_number)
+        ax_list[0].axvline(x=(early_stopping_epoch_number - 1))
+        ax_list[1].axvline(x=(early_stopping_epoch_number - 1))
 
     fig.suptitle(title)
     plt.legend(loc=2)
-    plt.subplots_adjust(top=0.85)
+    #plt.subplots_adjust(top=0.85)
     plt.show()
 
 
