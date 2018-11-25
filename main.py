@@ -101,7 +101,7 @@ def main():
     CONFIG_VALIDATION_K_FOLD_CV_K = 3
 
     # here you can specify the learning rates that should be used during validation
-    CONFIG_VALIDATION_LEARNING_RATES = [0.05, 0.1, 0.5]
+    CONFIG_VALIDATION_LEARNING_RATES = [0.05, 0.1, 0.2]
 
     # here you can specify how many hidden layers the network should have as well as how many neurons the hidden layers should have
     CONFIG_VALIDATION_ARCHITECTURE = [
