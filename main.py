@@ -76,7 +76,7 @@ def main():
     CONFIG_VALIDATION_K_FOLD_CV_K = 3
 
     # here you can specify the learning rates that should be used during validation
-    CONFIG_VALIDATION_LEARNING_RATES = [0.1] # [0.05, 0.1, 0.5]
+    CONFIG_VALIDATION_LEARNING_RATES = [0.05, 0.1, 0.5]
 
     # here you can specify how many hidden layers the network should have as well as how many neurons the hidden layers should have
     CONFIG_VALIDATION_ARCHITECTURE = [
@@ -107,13 +107,13 @@ def main():
     X, mns, sstd = normalize(X)
     X_tst, _, _ = normalize(X_tst, mns, sstd)
 
+    """
     print(X.shape)
     print(C1.shape)
     print(X_tst.shape)
     print(C1_tst.shape)
     print(compute_label_frequencies(C1))
     print(compute_label_frequencies(C1_tst))
-    """
     """
 
     C = create_one_out_of_k_represantation(C1)
@@ -389,6 +389,19 @@ def plot_errors_and_accuracies(title, train_loss_list, train_acc_list, val_loss_
     if test_loss_list is not None:
         ax_list[0].plot(test_loss_list, color='red', label='testing', lw=2)
 
+    # missclassification rate plot
+    train_mcr_list = np.subtract(np.ones(len(train_acc_list), dtype=np.float64), train_acc_list)
+    ax_list[1].plot(train_mcr_list, color='blue', label='training', lw=2)
+
+    if val_acc_list is not None:
+        val_mcr_list = np.subtract(np.ones(len(val_acc_list), dtype=np.float64), val_acc_list)
+        ax_list[1].plot(val_mcr_list, color='green', label='validation', lw=2)
+
+    if test_acc_list is not None:
+        test_mcr_list = np.subtract(np.ones(len(test_acc_list), dtype=np.float64), test_acc_list)
+        ax_list[1].plot(test_mcr_list, color='red', label='testing', lw=2)
+
+    """
     # accuracy plot
     ax_list[1].plot(train_acc_list, color='blue', label='training', lw=2)
 
@@ -397,11 +410,13 @@ def plot_errors_and_accuracies(title, train_loss_list, train_acc_list, val_loss_
 
     if test_acc_list is not None:
         ax_list[1].plot(test_acc_list, color='red', label='testing', lw=2)
+    """
 
     ax_list[0].set_xlabel('training iterations')
     ax_list[1].set_xlabel('training iterations')
     ax_list[0].set_ylabel('Cross-entropy')
-    ax_list[1].set_ylabel('Accuracy')
+    ax_list[1].set_ylabel('Missclassification rate')
+    #ax_list[1].set_ylabel('Accuracy')
 
     # shows vertical line where early stopping occurred...
     if early_stopping_epoch_number is not None:
@@ -409,9 +424,8 @@ def plot_errors_and_accuracies(title, train_loss_list, train_acc_list, val_loss_
         ax_list[1].axvline(x=early_stopping_epoch_number)
 
     fig.suptitle(title)
-    fig.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.legend(loc=2)
-    #plt.subplots_adjust(top=0.85)
+    plt.subplots_adjust(top=0.85)
     plt.show()
 
 
