@@ -179,7 +179,7 @@ def main():
         #n_train = int(len(X) * (1.0-CONFIG_VALIDATION_SET_SIZE))
         X_train, C_train = X_full_train, C_full_train
 
-        tr = train_and_evaluate_resnet(X_train, C_train, None, None, X_tst, C_tst, learning_rate,
+        tr = train_and_evaluate_resnet(X_train, C_train, X_tst, C_tst, learning_rate,
                                 n_hidden, n_iter=CONFIG_VALIDATION_NUM_OF_TOTAL_TRAIN_EPOCHS)
         misclassification_rate = 1 - tr.test_acc_list[tr.early_stopping_epoch_number - 1]
         print_training_result_summary(tr)
@@ -197,33 +197,40 @@ def main():
         print()
         print('-' * 80)
         print("*** Summary of best model (during validation phase) ***")
-        print("   LearningRate={}, Fixed Architecture={}".format(best_learning_rate, best_architecture))
+        print("   LearningRate={}, Architecture={}".format(best_learning_rate, n_hidden))
         print("   Early stopping: number_of_epochs={}".format(best_training_result.early_stopping_epoch_number))
         print_training_result_summary(best_training_result)
         print()
         print("=" * 80)
         print()
         print('c) retrain with full training data set and best parameters')
-        print("   LearningRate={}, Fixed Architecture={}".format(best_learning_rate, best_architecture))
+        print("   LearningRate={}, Architecture={}".format(best_learning_rate, n_hidden))
         print("-" * 80)
+
+        ###############################################
+        #                                             #
+        #    FIXME: get rid of the error below!!!     #
+        #                                             #
+        ###############################################
+
+        """
         plot_title = "Final Training - Learn. rate: {:.2f}, {} hidden layer{} (Neurons: {})".format(
             best_learning_rate, len(best_architecture),
             "s" if len(best_architecture) != 1 else "",
             ", ".join(map(str, best_architecture)))
+        """
 
         expected_epoch_number = best_training_result.early_stopping_epoch_number
-        tr = train_and_evaluate_resnet(X_full_train, C_full_train, None, None, X_tst, C_tst,
-                                best_learning_rate, n_hidden,
-                                n_iter=CONFIG_FINAL_TRAINING_NUM_OF_TOTAL_TRAIN_EPOCHS,
-                                best_training_result=best_training_result)
+        tr = train_and_evaluate_resnet(X_full_train, C_full_train, X_tst, C_tst, best_learning_rate, n_hidden,
+                                       n_iter=CONFIG_FINAL_TRAINING_NUM_OF_TOTAL_TRAIN_EPOCHS,
+                                       best_training_result=best_training_result)
         assert expected_epoch_number == tr.early_stopping_epoch_number
         print_training_result_summary(tr)
         plot_errors_and_accuracies(plot_title, tr.train_loss_list, tr.train_acc_list, None, None, tr.test_loss_list,
                                    tr.test_acc_list, tr.early_stopping_epoch_number)
 
 
-def train_and_evaluate(X_train, C_train, X_val, C_val, X_test, C_test, learning_rate,
-                       n_hidden, n_iter, best_training_result=None):
+def train_and_evaluate(X_train, C_train, X_test, C_test, learning_rate, n_hidden, n_iter, best_training_result=None):
     n_in = 300
     n_out = 26
 
@@ -236,7 +243,6 @@ def train_and_evaluate(X_train, C_train, X_val, C_val, X_test, C_test, learning_
         n_previous = n_current_hidden
 
     w_out = tf.Variable(rd.randn(n_previous, n_out) / np.sqrt(n_in), trainable=True)
-    #regularizers = sum(map(lambda weight_variable: tf.nn.l2_loss(weight_variable), W_hid_list + [w_out]))
     b_out = tf.Variable(np.zeros(n_out), trainable=True)
 
     # Define the neuron operations
@@ -246,11 +252,8 @@ def train_and_evaluate(X_train, C_train, X_val, C_val, X_test, C_test, learning_
         x_current = tf.nn.relu(tf.matmul(x_current, W_hid) + b_hid)
     z = tf.nn.softmax(tf.matmul(x_current, w_out) + b_out)
 
-    beta = 0.01
     z_ = tf.placeholder(shape=(None, n_out), dtype=tf.float64)
     cross_entropy = tf.reduce_mean(-tf.reduce_sum(z_ * tf.log(z), reduction_indices=[1]))
-    #cross_entropy = tf.reduce_mean(tf.reduce_mean(-tf.reduce_sum(z_ * tf.log(z), reduction_indices=[1])) + beta * regularizers)
-    #cross_entropy = tf.reduce_mean(-tf.reduce_sum(z_ * tf.log(z), reduction_indices=[1]) + beta * regularizers)
 
     # The operation to perform gradient descent.
     # Note that train_step is still a **symbolic operation**, it needs to be executed to update the variables.
@@ -345,8 +348,9 @@ def train_and_evaluate(X_train, C_train, X_val, C_val, X_test, C_test, learning_
     return train_result
 
 
-def train_and_evaluate_resnet(X_train, C_train, X_val, C_val, X_test, C_test, learning_rate,
-                       n_hidden, n_iter, best_training_result=None):
+def train_and_evaluate_resnet(X_train, C_train, X_test, C_test, learning_rate, n_hidden, n_iter, best_training_result=None):
+    assert(len(list(n_hidden)) == 9, "This network should have 9 hidden layers!")
+    assert(all(map(lambda n: n == 40, list(n_hidden))), "Each hidden layer must have exactly 40 neurons!")
     n_in = 300
     n_out = 26
 
@@ -359,29 +363,32 @@ def train_and_evaluate_resnet(X_train, C_train, X_val, C_val, X_test, C_test, le
         n_previous = n_current_hidden
 
     w_out = tf.Variable(rd.randn(n_previous, n_out) / np.sqrt(n_in), trainable=True)
-    #regularizers = sum(map(lambda weight_variable: tf.nn.l2_loss(weight_variable), W_hid_list + [w_out]))
     b_out = tf.Variable(np.zeros(n_out), trainable=True)
 
     # Define the neuron operations
     x_current = x_input = tf.placeholder(shape=(None, n_in), dtype=tf.float64)
 
-    x_prev = 0
+    x_prev = None
     i = 0
+    i_prev = -1
+    n_residual_blocks = 0
     for W_hid, b_hid in zip(W_hid_list, b_hid_list):
-        if i == 0 or i % 2 == 1:
+        if i == 0 or (i % 2) == 1:
             x_prev = x_current
+            i_prev = i - 1
+            print("Normal hidden layer #{}".format(i))
             x_current = tf.nn.relu(tf.matmul(x_current, W_hid) + b_hid)
         else:
-           x_current = tf.nn.relu(x_prev +tf.matmul(x_current, W_hid) + b_hid)
-        i = i + 1
+            print("Residual block #{} -> previous layer: {}, layer before previous layer: {}".format(n_residual_blocks, (i-1), i_prev))
+            x_current = tf.nn.relu(x_prev + tf.matmul(x_current, W_hid) + b_hid)
+            n_residual_blocks += 1
+        i += 1
 
+    assert(n_residual_blocks == 4, "There must only be 4 residual blocks in this network!")
     z = tf.nn.softmax(tf.matmul(x_current, w_out) + b_out)
 
-    beta = 0.01
     z_ = tf.placeholder(shape=(None, n_out), dtype=tf.float64)
     cross_entropy = tf.reduce_mean(-tf.reduce_sum(z_ * tf.log(z), reduction_indices=[1]))
-    #cross_entropy = tf.reduce_mean(tf.reduce_mean(-tf.reduce_sum(z_ * tf.log(z), reduction_indices=[1])) + beta * regularizers)
-    #cross_entropy = tf.reduce_mean(-tf.reduce_sum(z_ * tf.log(z), reduction_indices=[1]) + beta * regularizers)
 
     # The operation to perform gradient descent.
     # Note that train_step is still a **symbolic operation**, it needs to be executed to update the variables.
@@ -474,6 +481,7 @@ def train_and_evaluate_resnet(X_train, C_train, X_val, C_val, X_test, C_test, le
         test_loss_list,
         test_acc_list)
     return train_result
+
 
 def plot_errors_and_accuracies(title, train_loss_list, train_acc_list, test_loss_list=None,
                                test_acc_list=None, early_stopping_epoch_number=None):
@@ -527,7 +535,6 @@ def create_one_out_of_k_represantation(C1):
         reached = False
         for k in range(0, 26):
             if k == (C1[i] - 1):
-                #print(k)
                 C[i][k] = 1
                 reached = True
         assert reached is True, "WHY!?!? {}".format(C1[i])
