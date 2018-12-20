@@ -105,18 +105,8 @@ def main():
     #       The best epoch determined via early stopping is then shown in the plot as a vertical line.
     CONFIG_VALIDATION_NUM_OF_TOTAL_TRAIN_EPOCHS = 200
 
-    # number of total iterations for final training
-    # Note: Although the misclassification error is measured at the epoch which was determined during the
-    #       validation phase via early-stopping, the training is continued for the purpose of plotting.
-    CONFIG_FINAL_TRAINING_NUM_OF_TOTAL_TRAIN_EPOCHS = 200
-
-    # here you can specify whether you want to use k-fold Cross validation or not and also set a reasonable value for k
-    CONFIG_VALIDATION_K_FOLD_CV_ENABLE = False
-    CONFIG_VALIDATION_K_FOLD_CV_K = 3
-
     # here you can specify the learning rates that should be used during validation
     CONFIG_VALIDATION_LEARNING_RATES = [0.0005, 0.0001, 0.001, 0.002, 0.005]
-    #learning_rate = 0.001
     ####################################################################################################################
 
     # Import dataset and libraries.
@@ -132,15 +122,6 @@ def main():
     # a)
     X, mns, sstd = normalize(X)
     X_tst, _, _ = normalize(X_tst, mns, sstd)
-
-    """
-    print(X.shape)
-    print(C1.shape)
-    print(X_tst.shape)
-    print(C1_tst.shape)
-    print(compute_label_frequencies(C1))
-    print(compute_label_frequencies(C1_tst))
-    """
 
     C = create_one_out_of_k_represantation(C1)
     C_tst = create_one_out_of_k_represantation(C1_tst)
@@ -161,13 +142,12 @@ def main():
     best_training_misclassification_rate = None
     best_learning_rate = 0.0
 
-    # b) train, meta-parameter search, and validate
+    # a) train and evaluate deep network
     print()
     print("=" * 80)
     print()
-    print('b) train, meta-parameter search, and validate')
+    print('b) train and evaluate deep network')
     n_hidden = (40, 40, 40, 40, 40, 40, 40, 40, 40)
-    #n_hidden = (40, 40)
     for learning_rate in CONFIG_VALIDATION_LEARNING_RATES:
         print()
         print("-" * 80)
@@ -176,10 +156,8 @@ def main():
         plot_title = "Validation - Learn. rate: {:.3f}, {} hidden layer{}".format(learning_rate, len(n_hidden),
                                                                                   "s" if len(n_hidden) != 1 else "")
 
-        #n_train = int(len(X) * (1.0-CONFIG_VALIDATION_SET_SIZE))
         X_train, C_train = X_full_train, C_full_train
-
-        tr = train_and_evaluate_resnet(X_train, C_train, X_tst, C_tst, learning_rate,
+        tr = train_and_evaluate(X_train, C_train, X_tst, C_tst, learning_rate,
                                 n_hidden, n_iter=CONFIG_VALIDATION_NUM_OF_TOTAL_TRAIN_EPOCHS)
         misclassification_rate = 1 - tr.test_acc_list[tr.early_stopping_epoch_number - 1]
         print_training_result_summary(tr)
@@ -187,12 +165,12 @@ def main():
                                    tr.test_loss_list,
                                    tr.test_acc_list,
                                    tr.early_stopping_epoch_number)
+
         if best_training_misclassification_rate is None or misclassification_rate < best_training_misclassification_rate:
             best_training_result = tr
             best_training_misclassification_rate = misclassification_rate
             best_learning_rate = learning_rate
 
-    # c) retrain with full training data set and best parameters
     if best_training_misclassification_rate is not None:
         print()
         print('-' * 80)
@@ -200,34 +178,43 @@ def main():
         print("   LearningRate={}, Architecture={}".format(best_learning_rate, n_hidden))
         print("   Early stopping: number_of_epochs={}".format(best_training_result.early_stopping_epoch_number))
         print_training_result_summary(best_training_result)
+
+    # b) train and evaluate ResNet
+    print()
+    print("=" * 80)
+    print()
+    print('b) train and evaluate ResNet')
+    n_hidden = (40, 40, 40, 40, 40, 40, 40, 40, 40)
+    for learning_rate in CONFIG_VALIDATION_LEARNING_RATES:
         print()
-        print("=" * 80)
-        print()
-        print('c) retrain with full training data set and best parameters')
-        print("   LearningRate={}, Architecture={}".format(best_learning_rate, n_hidden))
         print("-" * 80)
+        print("   LearningRate={}, Architecture={}".format(learning_rate, n_hidden))
+        print("-" * 80)
+        plot_title = "Validation - Learn. rate: {:.3f}, {} hidden layer{}".format(learning_rate, len(n_hidden),
+                                                                                  "s" if len(n_hidden) != 1 else "")
 
-        ###############################################
-        #                                             #
-        #    FIXME: get rid of the error below!!!     #
-        #                                             #
-        ###############################################
-
-        """
-        plot_title = "Final Training - Learn. rate: {:.2f}, {} hidden layer{} (Neurons: {})".format(
-            best_learning_rate, len(best_architecture),
-            "s" if len(best_architecture) != 1 else "",
-            ", ".join(map(str, best_architecture)))
-        """
-
-        expected_epoch_number = best_training_result.early_stopping_epoch_number
-        tr = train_and_evaluate_resnet(X_full_train, C_full_train, X_tst, C_tst, best_learning_rate, n_hidden,
-                                       n_iter=CONFIG_FINAL_TRAINING_NUM_OF_TOTAL_TRAIN_EPOCHS,
-                                       best_training_result=best_training_result)
-        assert expected_epoch_number == tr.early_stopping_epoch_number
+        X_train, C_train = X_full_train, C_full_train
+        tr = train_and_evaluate_resnet(X_train, C_train, X_tst, C_tst, learning_rate,
+                                       n_hidden, n_iter=CONFIG_VALIDATION_NUM_OF_TOTAL_TRAIN_EPOCHS)
+        misclassification_rate = 1 - tr.test_acc_list[tr.early_stopping_epoch_number - 1]
         print_training_result_summary(tr)
-        plot_errors_and_accuracies(plot_title, tr.train_loss_list, tr.train_acc_list, None, None, tr.test_loss_list,
-                                   tr.test_acc_list, tr.early_stopping_epoch_number)
+        plot_errors_and_accuracies(plot_title, tr.train_loss_list, tr.train_acc_list,
+                                   tr.test_loss_list,
+                                   tr.test_acc_list,
+                                   tr.early_stopping_epoch_number)
+
+        if best_training_misclassification_rate is None or misclassification_rate < best_training_misclassification_rate:
+            best_training_result = tr
+            best_training_misclassification_rate = misclassification_rate
+            best_learning_rate = learning_rate
+
+    if best_training_misclassification_rate is not None:
+        print()
+        print('-' * 80)
+        print("*** Summary of best model (during validation phase) ***")
+        print("   LearningRate={}, Architecture={}".format(best_learning_rate, n_hidden))
+        print("   Early stopping: number_of_epochs={}".format(best_training_result.early_stopping_epoch_number))
+        print_training_result_summary(best_training_result)
 
 
 def train_and_evaluate(X_train, C_train, X_test, C_test, learning_rate, n_hidden, n_iter, best_training_result=None):
@@ -250,10 +237,12 @@ def train_and_evaluate(X_train, C_train, X_test, C_test, learning_rate, n_hidden
     for W_hid, b_hid in zip(W_hid_list, b_hid_list):
         #x_current = tf.nn.tanh(tf.matmul(x_current, W_hid) + b_hid)
         x_current = tf.nn.relu(tf.matmul(x_current, W_hid) + b_hid)
-    z = tf.nn.softmax(tf.matmul(x_current, w_out) + b_out)
+    z_out = tf.matmul(x_current, w_out) + b_out
+    z = tf.nn.softmax(z_out)
 
     z_ = tf.placeholder(shape=(None, n_out), dtype=tf.float64)
-    cross_entropy = tf.reduce_mean(-tf.reduce_sum(z_ * tf.log(z), reduction_indices=[1]))
+    #cross_entropy = tf.reduce_mean(-tf.reduce_sum(z_ * tf.log(z), reduction_indices=[1]))
+    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=z_out, labels=z_))
 
     # The operation to perform gradient descent.
     # Note that train_step is still a **symbolic operation**, it needs to be executed to update the variables.
@@ -385,10 +374,13 @@ def train_and_evaluate_resnet(X_train, C_train, X_test, C_test, learning_rate, n
         i += 1
 
     assert(n_residual_blocks == 4, "There must only be 4 residual blocks in this network!")
-    z = tf.nn.softmax(tf.matmul(x_current, w_out) + b_out)
+    z_out = tf.matmul(x_current, w_out) + b_out
+    z = tf.nn.softmax(z_out)
 
     z_ = tf.placeholder(shape=(None, n_out), dtype=tf.float64)
-    cross_entropy = tf.reduce_mean(-tf.reduce_sum(z_ * tf.log(z), reduction_indices=[1]))
+
+    #cross_entropy = tf.reduce_mean(-tf.reduce_sum(z_ * tf.log(z), reduction_indices=[1]))
+    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=z_out, labels=z_))
 
     # The operation to perform gradient descent.
     # Note that train_step is still a **symbolic operation**, it needs to be executed to update the variables.
