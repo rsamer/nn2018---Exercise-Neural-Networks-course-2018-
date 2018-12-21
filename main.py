@@ -106,7 +106,7 @@ def main():
     CONFIG_VALIDATION_NUM_OF_TOTAL_TRAIN_EPOCHS = 200
 
     # here you can specify the learning rates that should be used during validation
-    CONFIG_VALIDATION_LEARNING_RATES = [0.0005, 0.0001, 0.001, 0.002, 0.005]
+    CONFIG_VALIDATION_LEARNING_RATES = [0.0005, 0.0001, 0.001, 0.002, 0.005, 0.009, 0.01]
     ####################################################################################################################
 
     # Import dataset and libraries.
@@ -154,7 +154,7 @@ def main():
             print("-" * 80)
             print("   LearningRate={}, Architecture={}".format(learning_rate, activation_function))
             print("-" * 80)
-            plot_title = "Evaluation of {} architecture - Learn. rate: {:.3f}".format(activation_function, learning_rate)
+            plot_title = "{} - Learn. rate: {}".format(activation_function, learning_rate)
 
             X_train, C_train = X_full_train, C_full_train
             tr = train_and_evaluate(activation_function, X_train, C_train, X_tst, C_tst, learning_rate,
@@ -190,7 +190,7 @@ def main():
         print("-" * 80)
         print("   LearningRate={}, Architecture=ResNet".format(learning_rate))
         print("-" * 80)
-        plot_title = "Evaluation of ResNet architecture - Learn. rate: {:.3f}".format(learning_rate)
+        plot_title = "ResNet - Learn. rate: {}".format(learning_rate)
 
         X_train, C_train = X_full_train, C_full_train
         tr = train_and_evaluate_resnet(X_train, C_train, X_tst, C_tst, learning_rate,
