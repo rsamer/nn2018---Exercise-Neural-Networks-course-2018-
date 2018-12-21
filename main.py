@@ -103,7 +103,7 @@ def main():
     #       minimal cross-entropy error are preserved for final training, the training is further continued until
     #       the defined epoch limit is reached for the purpose of plotting.
     #       The best epoch determined via early stopping is then shown in the plot as a vertical line.
-    CONFIG_VALIDATION_NUM_OF_TOTAL_TRAIN_EPOCHS = 200
+    CONFIG_VALIDATION_NUM_OF_TOTAL_TRAIN_EPOCHS = 600
 
     # here you can specify the learning rates that should be used during validation
     CONFIG_VALIDATION_LEARNING_RATES = [0.0005, 0.0001, 0.001, 0.002, 0.005, 0.009, 0.01]
