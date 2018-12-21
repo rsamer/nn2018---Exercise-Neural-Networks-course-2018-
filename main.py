@@ -148,36 +148,36 @@ def main():
     print()
     print('b) train and evaluate deep network')
     n_hidden = (40, 40, 40, 40, 40, 40, 40, 40, 40)
-    for learning_rate in CONFIG_VALIDATION_LEARNING_RATES:
-        print()
-        print("-" * 80)
-        print("   LearningRate={}, Architecture={}".format(learning_rate, n_hidden))
-        print("-" * 80)
-        plot_title = "Validation - Learn. rate: {:.3f}, {} hidden layer{}".format(learning_rate, len(n_hidden),
-                                                                                  "s" if len(n_hidden) != 1 else "")
+    for activation_function in ["Tanh", "ReLu"]:
+        for learning_rate in CONFIG_VALIDATION_LEARNING_RATES:
+            print()
+            print("-" * 80)
+            print("   LearningRate={}, Architecture={}".format(learning_rate, activation_function))
+            print("-" * 80)
+            plot_title = "Evaluation of {} architecture - Learn. rate: {:.3f}".format(activation_function, learning_rate)
 
-        X_train, C_train = X_full_train, C_full_train
-        tr = train_and_evaluate(X_train, C_train, X_tst, C_tst, learning_rate,
-                                n_hidden, n_iter=CONFIG_VALIDATION_NUM_OF_TOTAL_TRAIN_EPOCHS)
-        misclassification_rate = 1 - tr.test_acc_list[tr.early_stopping_epoch_number - 1]
-        print_training_result_summary(tr)
-        plot_errors_and_accuracies(plot_title, tr.train_loss_list, tr.train_acc_list,
-                                   tr.test_loss_list,
-                                   tr.test_acc_list,
-                                   tr.early_stopping_epoch_number)
+            X_train, C_train = X_full_train, C_full_train
+            tr = train_and_evaluate(activation_function, X_train, C_train, X_tst, C_tst, learning_rate,
+                                    n_hidden, n_iter=CONFIG_VALIDATION_NUM_OF_TOTAL_TRAIN_EPOCHS)
+            misclassification_rate = 1 - tr.test_acc_list[tr.early_stopping_epoch_number - 1]
+            print_training_result_summary(tr)
+            plot_errors_and_accuracies(plot_title, tr.train_loss_list, tr.train_acc_list,
+                                       tr.test_loss_list,
+                                       tr.test_acc_list,
+                                       tr.early_stopping_epoch_number)
 
-        if best_training_misclassification_rate is None or misclassification_rate < best_training_misclassification_rate:
-            best_training_result = tr
-            best_training_misclassification_rate = misclassification_rate
-            best_learning_rate = learning_rate
+            if best_training_misclassification_rate is None or misclassification_rate < best_training_misclassification_rate:
+                best_training_result = tr
+                best_training_misclassification_rate = misclassification_rate
+                best_learning_rate = learning_rate
 
-    if best_training_misclassification_rate is not None:
-        print()
-        print('-' * 80)
-        print("*** Summary of best model (during validation phase) ***")
-        print("   LearningRate={}, Architecture={}".format(best_learning_rate, n_hidden))
-        print("   Early stopping: number_of_epochs={}".format(best_training_result.early_stopping_epoch_number))
-        print_training_result_summary(best_training_result)
+        if best_training_misclassification_rate is not None:
+            print()
+            print('-' * 80)
+            print("*** Summary of best model (during validation phase) ***")
+            print("   LearningRate={}, Architecture={}".format(best_learning_rate, n_hidden))
+            print("   Early stopping: number_of_epochs={}".format(best_training_result.early_stopping_epoch_number))
+            print_training_result_summary(best_training_result)
 
     # b) train and evaluate ResNet
     print()
@@ -188,10 +188,9 @@ def main():
     for learning_rate in CONFIG_VALIDATION_LEARNING_RATES:
         print()
         print("-" * 80)
-        print("   LearningRate={}, Architecture={}".format(learning_rate, n_hidden))
+        print("   LearningRate={}, Architecture=ResNet".format(learning_rate))
         print("-" * 80)
-        plot_title = "Validation - Learn. rate: {:.3f}, {} hidden layer{}".format(learning_rate, len(n_hidden),
-                                                                                  "s" if len(n_hidden) != 1 else "")
+        plot_title = "Evaluation of ResNet architecture - Learn. rate: {:.3f}".format(learning_rate)
 
         X_train, C_train = X_full_train, C_full_train
         tr = train_and_evaluate_resnet(X_train, C_train, X_tst, C_tst, learning_rate,
@@ -217,7 +216,7 @@ def main():
         print_training_result_summary(best_training_result)
 
 
-def train_and_evaluate(X_train, C_train, X_test, C_test, learning_rate, n_hidden, n_iter, best_training_result=None):
+def train_and_evaluate(activation_function, X_train, C_train, X_test, C_test, learning_rate, n_hidden, n_iter, best_training_result=None):
     n_in = 300
     n_out = 26
 
@@ -235,8 +234,12 @@ def train_and_evaluate(X_train, C_train, X_test, C_test, learning_rate, n_hidden
     # Define the neuron operations
     x_current = x_input = tf.placeholder(shape=(None, n_in), dtype=tf.float64)
     for W_hid, b_hid in zip(W_hid_list, b_hid_list):
-        #x_current = tf.nn.tanh(tf.matmul(x_current, W_hid) + b_hid)
-        x_current = tf.nn.relu(tf.matmul(x_current, W_hid) + b_hid)
+        if activation_function == "Tanh":
+            print("Tanh")
+            x_current = tf.nn.tanh(tf.matmul(x_current, W_hid) + b_hid)
+        else:
+            print("ReLu")
+            x_current = tf.nn.relu(tf.matmul(x_current, W_hid) + b_hid)
     z_out = tf.matmul(x_current, w_out) + b_out
     z = tf.nn.softmax(z_out)
 
