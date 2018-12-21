@@ -106,7 +106,7 @@ def main():
     CONFIG_VALIDATION_NUM_OF_TOTAL_TRAIN_EPOCHS = 200
 
     # here you can specify the learning rates that should be used during validation
-    CONFIG_VALIDATION_LEARNING_RATES = [0.0005, 0.0001, 0.001, 0.002, 0.005]
+    CONFIG_VALIDATION_LEARNING_RATES = [0.0005, 0.0001, 0.001, 0.002, 0.005, 0.009, 0.01]
     ####################################################################################################################
 
     # Import dataset and libraries.
@@ -153,8 +153,9 @@ def main():
         print("-" * 80)
         print("   LearningRate={}, Architecture={}".format(learning_rate, n_hidden))
         print("-" * 80)
-        plot_title = "Validation - Learn. rate: {:.3f}, {} hidden layer{}".format(learning_rate, len(n_hidden),
-                                                                                  "s" if len(n_hidden) != 1 else "")
+
+
+        plot_title = "Tanh - Learn. rate: {}".format(learning_rate)
 
         X_train, C_train = X_full_train, C_full_train
         tr = train_and_evaluate(X_train, C_train, X_tst, C_tst, learning_rate,
@@ -190,8 +191,7 @@ def main():
         print("-" * 80)
         print("   LearningRate={}, Architecture={}".format(learning_rate, n_hidden))
         print("-" * 80)
-        plot_title = "Validation - Learn. rate: {:.3f}, {} hidden layer{}".format(learning_rate, len(n_hidden),
-                                                                                  "s" if len(n_hidden) != 1 else "")
+        plot_title = "ResNet - Learn. rate: {}".format(learning_rate)
 
         X_train, C_train = X_full_train, C_full_train
         tr = train_and_evaluate_resnet(X_train, C_train, X_tst, C_tst, learning_rate,
@@ -235,8 +235,8 @@ def train_and_evaluate(X_train, C_train, X_test, C_test, learning_rate, n_hidden
     # Define the neuron operations
     x_current = x_input = tf.placeholder(shape=(None, n_in), dtype=tf.float64)
     for W_hid, b_hid in zip(W_hid_list, b_hid_list):
-        #x_current = tf.nn.tanh(tf.matmul(x_current, W_hid) + b_hid)
-        x_current = tf.nn.relu(tf.matmul(x_current, W_hid) + b_hid)
+        x_current = tf.nn.tanh(tf.matmul(x_current, W_hid) + b_hid)
+        #x_current = tf.nn.relu(tf.matmul(x_current, W_hid) + b_hid)
     z_out = tf.matmul(x_current, w_out) + b_out
     z = tf.nn.softmax(z_out)
 
