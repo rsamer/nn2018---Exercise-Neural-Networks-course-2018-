@@ -235,10 +235,8 @@ def train_and_evaluate(activation_function, X_train, C_train, X_test, C_test, le
     x_current = x_input = tf.placeholder(shape=(None, n_in), dtype=tf.float64)
     for W_hid, b_hid in zip(W_hid_list, b_hid_list):
         if activation_function == "Tanh":
-            print("Tanh")
             x_current = tf.nn.tanh(tf.matmul(x_current, W_hid) + b_hid)
         else:
-            print("ReLu")
             x_current = tf.nn.relu(tf.matmul(x_current, W_hid) + b_hid)
     z_out = tf.matmul(x_current, w_out) + b_out
     z = tf.nn.softmax(z_out)
