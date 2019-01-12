@@ -1,539 +1,208 @@
+#!/usr/bin/env python3
+
+# Classify delayed XOR in a {0,1} string, in input strings of VARIABLE length
+
 import matplotlib.pyplot as plt
 import numpy as np
-import numpy.random as rd
 import tensorflow as tf
-#from nn18_ex2_load import load_isolet
-import collections
+import random
+from data_generator import generate_data
+import grammar
 
 
-TrainingResult = collections.namedtuple("TrainingResult", [
-    "early_stopping_epoch_number",
-    "early_stopping_val_loss_min",
-    "initial_W_hid_list",
-    "initial_b_hid_list",
-    "initial_w_out",
-    "initial_b_out",
-    "train_loss_list",
-    "train_acc_list",
-    "test_loss_list",
-    "test_acc_list"
-])
+########################################################################################################################
+#
+#          TODO: DO NOT FORGET TO INCLUDE ALL FUNCTIONS FROM grammar.py INTO THIS FILE
+#
+########################################################################################################################
 
 
-def load_isolet():
-    # Loads the isolet dataset
-    # Returns:
-    # X....feature vectors (training set), X[i,:] is the i-th example
-    # C....target classes
-    # X_tst...feature vectors (test set)
-    # C_tst...classes (test set)
 
-    import pickle as pckl  # to load dataset
-    import pylab as pl  # for graphics
-    # from numpy import *
+def generate_samples():
+    X = []
+    X_str = []
+    y = []
+    seq_lengths = []
+    for i in range(6000):
+        sample_str = grammar.make_reber()
+        sample_input_vec = grammar.str_to_vec(sample_str)
+        sample_target_vec = grammar.str_to_next(sample_str)
+        temp = grammar.vec_to_str(sample_input_vec)
+        assert(temp == sample_str)
+        X += [sample_input_vec]
+        X_str += [sample_str]
+        y += [sample_target_vec]
+        seq_lengths += [sample_input_vec.shape[0]]
 
-    pl.close('all')  # closes all previous figures
-
-    # Load dataset
-    file_in = open('isolet_crop_train.pkl', 'rb')
-    isolet_data = pckl.load(file_in)  # Python 3
-    # isolet_data = pckl.load(file_in, encoding='bytes') # Python 3
-    file_in.close()
-    X = isolet_data[0]  # input vectors X[i,:] is i-th example
-    C = isolet_data[1]  # classes C[i] is class of i-th example
-
-    file_in = open('isolet_crop_test.pkl', 'rb')
-    isolet_test = pckl.load(file_in)  # Python 3
-    file_in.close()
-
-    X_tst = isolet_test[0]  # input vectors X[i,:] is i-th example
-    C_tst = isolet_test[1]  # classes C[i] is class of i-th example
-
-    return (X, C, X_tst, C_tst)
-
-
-def compute_label_frequencies(C1):
-    frequencies = {}
-    for i, val in enumerate(C1):
-        if val not in frequencies:
-            frequencies[val] = 0
-        frequencies[val] += 1
-    return frequencies
-
-
-def normalize(X, mns=None, sstd=None):
-    '''
-    based on scipy.stats.stats.zscore
-    '''
-    X = np.asanyarray(X)
-    mns = X.mean(axis=0) if mns is None else mns
-    sstd = X.std(axis=0, ddof=0) if sstd is None else sstd
-    normalized_X = (X - mns) / sstd
-    return normalized_X, mns, sstd
-
-
-def print_training_result_summary(tr):
-    print()
-    early_stopping_test_acc = tr.test_acc_list[tr.early_stopping_epoch_number - 1]
-    early_stopping_test_loss = tr.test_loss_list[tr.early_stopping_epoch_number - 1]
-    early_stopping_train_acc = tr.train_acc_list[tr.early_stopping_epoch_number - 1]
-    early_stopping_train_loss = tr.train_loss_list[tr.early_stopping_epoch_number - 1]
-    misclassification_rate = 1 - early_stopping_test_acc
-    print("*** Final training result ***")
-    print("  best iteration number: {}".format(tr.early_stopping_epoch_number))
-    print("  training loss: {:.3f}".format(early_stopping_train_loss))
-    print("  training accuracy: {:.3f}".format(early_stopping_train_acc))
-    print("  test loss: {:.3f}".format(early_stopping_test_loss))
-    print("  test accuracy: {:.3f}".format(early_stopping_test_acc))
-    print("  test misclassification rate: {:.3f}".format(misclassification_rate))
-    print()
+    X_train, X_val, X_test = X[:5000], X[5000:5500], X[5500:]
+    y_train, y_val, y_test = y[:5000], y[5000:5500], y[5500:]
+    seq_len_train, seq_len_val, seq_len_test = seq_lengths[:5000], seq_lengths[5000:5500], seq_lengths[5500:]
+    assert len(X_train) == 5000
+    assert len(y_train) == 5000
+    assert len(seq_len_train) == 5000
+    assert len(X_val) == 500
+    assert len(y_val) == 500
+    assert len(seq_len_val) == 500
+    assert len(X_test) == 500
+    assert len(y_test) == 500
+    assert len(seq_len_test) == 500
+    return X_train, X_val, X_test, y_train, y_val, y_test, seq_len_train, seq_len_val, seq_len_test
 
 
 def main():
-    ####################################################################################################################
-    # Set configuration parameters here!                                                                               #
-    ####################################################################################################################
-
-    # here you can specify whether the training data should be shuffled or not
-    # For the given data set this is not so important as the samples already occur as repeated stratified samples
-    CONFIG_SHUFFLE_TRAINING_DATA = True
-
-    # number of total iterations for training during validation
-    # Note: Although early stopping happens before this defined limit such that the number of epochs with the
-    #       minimal cross-entropy error are preserved for final training, the training is further continued until
-    #       the defined epoch limit is reached for the purpose of plotting.
-    #       The best epoch determined via early stopping is then shown in the plot as a vertical line.
-    CONFIG_VALIDATION_NUM_OF_TOTAL_TRAIN_EPOCHS = 600
-
-    # here you can specify the learning rates that should be used during validation
-    CONFIG_VALIDATION_LEARNING_RATES = [0.0005, 0.0001, 0.001, 0.002, 0.005, 0.009, 0.01]
-    ####################################################################################################################
-
-    # Import dataset and libraries.
-    # Please ignore the deprecation warning while importing the MNIST dataset.
-
-    # Define your variables and the operations that define the tensorflow model.
-    # - x,y,z do have have numerical values, those are symbolic **"Tensors"**
-    # - x is a matrix and not a vector, is has shape [None,784]. The first dimension correspond to a **batch size**. Multiplying larger matrices is usually faster that multiplying small ones many times, using minibatches allows to process many images in a single matrix multiplication.
+    #tf.reset_default_graph()  # for iPython convenience
 
     # Give the dimension of the data and chose the number of hidden layer
-    (X, C1, X_tst, C1_tst) = load_isolet()
+    X_train, X_val, X_test, y_train, y_val, y_test, seq_len_train, seq_len_val, seq_len_test = generate_samples()
+    max_sequ_length = max(map(lambda s: s.shape[0], X_train + X_val + X_test))
+    X_train, X_val, X_test = np.array(X_train), np.array(X_val), np.array(X_test)
+    y_train, y_val, y_test = np.array(y_train), np.array(y_val), np.array(y_test)
+    print(max_sequ_length)
 
-    # a)
-    X, mns, sstd = normalize(X)
-    X_tst, _, _ = normalize(X_tst, mns, sstd)
+    # ----------------------------------------------------------------------
+    # parameters
 
-    C = create_one_out_of_k_represantation(C1)
-    C_tst = create_one_out_of_k_represantation(C1_tst)
+    #sequence_length = 20
+    num_train, num_valid, num_test = 2000, 500, 500
 
-    # fixed seed 42 to generate reproduceable results
-    if CONFIG_SHUFFLE_TRAINING_DATA:
-        rstate = np.random.RandomState(42)
-        shuffled_samples_and_labels = list(zip(X, C))
-        rstate.shuffle(shuffled_samples_and_labels)
-        X_full_train = np.array(list(map(lambda s: s[0], shuffled_samples_and_labels)))
-        C_full_train = np.array(list(map(lambda s: s[1], shuffled_samples_and_labels)))
+    #cell_type = 'simple'
+    #cell_type = 'gru'
+    cell_type = 'lstm'
+    num_hidden = 14
+
+    batch_size = 40 # TODO: vary this later...
+    learning_rate = 0.01
+    max_epoch = 200
+
+    # ----------------------------------------------------------------------
+
+    """
+    # Generate delayed XOR samples
+    X_train, y_train = generate_data(num_train, sequence_length)
+    sl_train = sequence_length * np.ones(num_train) # NEW
+
+    X_valid, y_valid = generate_data(num_valid, sequence_length)
+    sl_valid = sequence_length * np.ones(num_valid) # NEW
+
+    X_test, y_test = generate_data(num_test, sequence_length)
+    sl_test = sequence_length * np.ones(num_test) # NEW
+
+    # Crop data
+    # Artificially define variable sequence lengths
+    # for demo-purposes
+    for i in range(num_train):
+        ll = 10+random.randint(0,sequence_length-10)
+        sl_train[i] = ll
+
+    for i in range(num_valid):
+        ll = 10+random.randint(0,sequence_length-10)
+        sl_valid[i] = ll
+
+    for i in range(num_test):
+        ll = 10+random.randint(0,sequence_length-10)
+        sl_test[i] = ll
+    """
+
+    # placeholder for the sequence length of the examples
+    seq_length = tf.placeholder(tf.int32, [None])
+
+    # input tensor shape: number of examples, input length, dimensionality of each input
+    # at every time step, one bit is shown to the network
+    X = tf.placeholder(tf.float32, [None, max_sequ_length, 1])
+
+    # output tensor shape: number of examples, dimensionality of each output
+    # Binary output at end of sequence
+    y = tf.placeholder(tf.float32, [None, 1])
+
+    # define recurrent layer
+    if cell_type == 'simple':
+      cell = tf.nn.rnn_cell.BasicRNNCell(num_hidden)
+      # cell = tf.keras.layers.SimpleRNNCell(num_hidden) #alternative
+    elif cell_type == 'lstm':
+      cell = tf.nn.rnn_cell.LSTMCell(num_hidden)
+    elif cell_type == 'gru':
+      cell = tf.nn.rnn_cell.GRUCell(num_hidden)
     else:
-        X_full_train = X
-        C_full_train = C
+      raise ValueError('bad cell type.')
+    # Cells are one fully connected recurrent layer with num_hidden neurons
+    # Activation function can be defined as second argument.
+    # Standard activation function is tanh for BasicRNN and GRU
 
-    assert (len(X_full_train) == len(C_full_train))
-    best_training_result = None
-    best_training_misclassification_rate = None
-    best_learning_rate = 0.0
+    # only use outputs, ignore states
+    outputs, states = tf.nn.dynamic_rnn(cell, X, dtype=tf.float32, sequence_length=seq_length) # NEW
+    # tf.nn.dynamic_rnn(cell, inputs, ...)
+    # Creates a recurrent neural network specified by RNNCell cell.
+    # Performs fully dynamic unrolling of inputs.
+    # Returns:
+    # outputs: The RNN output Tensor shaped: [batch_size, max_time, cell.output_size].
 
-    # a) train and evaluate deep network
-    print()
-    print("=" * 80)
-    print()
-    print('b) train and evaluate deep network')
-    n_hidden = (40, 40, 40, 40, 40, 40, 40, 40, 40)
-    for activation_function in ["Tanh", "ReLu"]:
-        for learning_rate in CONFIG_VALIDATION_LEARNING_RATES:
-            print()
-            print("-" * 80)
-            print("   LearningRate={}, Architecture={}".format(learning_rate, activation_function))
-            print("-" * 80)
-            plot_title = "{} - Learn. rate: {}".format(activation_function, learning_rate)
+    # get the unit outputs at the last time step
+    last_outputs = outputs[:,-1,:]
 
-            X_train, C_train = X_full_train, C_full_train
-            tr = train_and_evaluate(activation_function, X_train, C_train, X_tst, C_tst, learning_rate,
-                                    n_hidden, n_iter=CONFIG_VALIDATION_NUM_OF_TOTAL_TRAIN_EPOCHS)
-            misclassification_rate = 1 - tr.test_acc_list[tr.early_stopping_epoch_number - 1]
-            print_training_result_summary(tr)
-            plot_errors_and_accuracies(plot_title, tr.train_loss_list, tr.train_acc_list,
-                                       tr.test_loss_list,
-                                       tr.test_acc_list,
-                                       tr.early_stopping_epoch_number)
+    # add output neuron
+    y_dim = int(y.shape[1])
+    w = tf.Variable(tf.truncated_normal([num_hidden, y_dim]))
+    b = tf.Variable(tf.constant(.1, shape=[y_dim]))
 
-            if best_training_misclassification_rate is None or misclassification_rate < best_training_misclassification_rate:
-                best_training_result = tr
-                best_training_misclassification_rate = misclassification_rate
-                best_learning_rate = learning_rate
+    #tf.contrib.rnn.OutputProjectionWrapper()
+    y_pred = tf.nn.xw_plus_b(last_outputs, w, b)
+    # Matrix multiplication with bias
 
-        if best_training_misclassification_rate is not None:
-            print()
-            print('-' * 80)
-            print("*** Summary of best model (during validation phase) ***")
-            print("   LearningRate={}, Architecture={}".format(best_learning_rate, n_hidden))
-            print("   Early stopping: number_of_epochs={}".format(best_training_result.early_stopping_epoch_number))
-            print_training_result_summary(best_training_result)
+    # define loss, minimizer and error
+    cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(logits=y_pred, labels=y)
+    train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
 
-    # b) train and evaluate ResNet
-    print()
-    print("=" * 80)
-    print()
-    print('b) train and evaluate ResNet')
-    n_hidden = (40, 40, 40, 40, 40, 40, 40, 40, 40)
-    for learning_rate in CONFIG_VALIDATION_LEARNING_RATES:
-        print()
-        print("-" * 80)
-        print("   LearningRate={}, Architecture=ResNet".format(learning_rate))
-        print("-" * 80)
-        plot_title = "ResNet - Learn. rate: {}".format(learning_rate)
+    mistakes = tf.not_equal(y, tf.maximum(tf.sign(y_pred), 0))
+    error = tf.reduce_mean(tf.cast(mistakes, tf.float32))
 
-        X_train, C_train = X_full_train, C_full_train
-        tr = train_and_evaluate_resnet(X_train, C_train, X_tst, C_tst, learning_rate,
-                                       n_hidden, n_iter=CONFIG_VALIDATION_NUM_OF_TOTAL_TRAIN_EPOCHS)
-        misclassification_rate = 1 - tr.test_acc_list[tr.early_stopping_epoch_number - 1]
-        print_training_result_summary(tr)
-        plot_errors_and_accuracies(plot_title, tr.train_loss_list, tr.train_acc_list,
-                                   tr.test_loss_list,
-                                   tr.test_acc_list,
-                                   tr.early_stopping_epoch_number)
-
-        if best_training_misclassification_rate is None or misclassification_rate < best_training_misclassification_rate:
-            best_training_result = tr
-            best_training_misclassification_rate = misclassification_rate
-            best_learning_rate = learning_rate
-
-    if best_training_misclassification_rate is not None:
-        print()
-        print('-' * 80)
-        print("*** Summary of best model (during validation phase) ***")
-        print("   LearningRate={}, Architecture={}".format(best_learning_rate, n_hidden))
-        print("   Early stopping: number_of_epochs={}".format(best_training_result.early_stopping_epoch_number))
-        print_training_result_summary(best_training_result)
-
-
-def train_and_evaluate(activation_function, X_train, C_train, X_test, C_test, learning_rate, n_hidden, n_iter, best_training_result=None):
-    n_in = 300
-    n_out = 26
-
-    # Set the variables
-    n_previous = n_in
-    W_hid_list, b_hid_list = [], []
-    for n_current_hidden in n_hidden:
-        W_hid_list += [tf.Variable(rd.randn(n_previous, n_current_hidden) / np.sqrt(n_in), trainable=True)]
-        b_hid_list += [tf.Variable(np.zeros(n_current_hidden), trainable=True)]
-        n_previous = n_current_hidden
-
-    w_out = tf.Variable(rd.randn(n_previous, n_out) / np.sqrt(n_in), trainable=True)
-    b_out = tf.Variable(np.zeros(n_out), trainable=True)
-
-    # Define the neuron operations
-    x_current = x_input = tf.placeholder(shape=(None, n_in), dtype=tf.float64)
-    for W_hid, b_hid in zip(W_hid_list, b_hid_list):
-        if activation_function == "Tanh":
-            x_current = tf.nn.tanh(tf.matmul(x_current, W_hid) + b_hid)
-        else:
-            x_current = tf.nn.relu(tf.matmul(x_current, W_hid) + b_hid)
-    z_out = tf.matmul(x_current, w_out) + b_out
-    z = tf.nn.softmax(z_out)
-
-    z_ = tf.placeholder(shape=(None, n_out), dtype=tf.float64)
-    #cross_entropy = tf.reduce_mean(-tf.reduce_sum(z_ * tf.log(z), reduction_indices=[1]))
-    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=z_out, labels=z_))
-
-    # The operation to perform gradient descent.
-    # Note that train_step is still a **symbolic operation**, it needs to be executed to update the variables.
-    #train_step = tf.train.GradientDescentOptimizer(learning_rate=learning_rate).minimize(cross_entropy)
-    train_step = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cross_entropy)
-
-    # To evaluate the performance in a readable way, we also compute the classification accuracy.
-    correct_prediction = tf.equal(tf.argmax(z, 1), tf.argmax(z_, 1))
-    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float64))
-
-    # Open a session and initialize the variables.
-    init = tf.global_variables_initializer()  # Create an op that will
     sess = tf.Session()
-    sess.run(init)  # Set the value of the variables to their initialization value
+    sess.run(tf.global_variables_initializer())
 
-    # Create some list to monitor how error decreases
-    test_loss_list = []
-    train_loss_list = []
+    # split data into batches
+    num_batches = int(X_train.shape[0] / batch_size)
+    #num_batches = int(len(X_train) / batch_size)
+    X_train_batches = np.array_split(X_train, num_batches)
+    y_train_batches = np.array_split(y_train, num_batches)
+    sl_train_batches = np.array_split(seq_len_train, num_batches)
 
-    test_acc_list = []
-    train_acc_list = []
+    # train
+    error_train_ = []
+    error_valid_ = []
 
-    # Create minibatches to train faster
-    k_batch = 20
-    X_batch_list = np.array_split(X_train, k_batch)
-    labels_batch_list = np.array_split(C_train, k_batch)
+    for n in range(max_epoch):
+        print('training epoch {0:d}'.format(n+1))
 
-    # early stopping parameters
-    early_stopping_val_missclassification_min = np.float64(np.inf)
-    early_stopping_epoch_number = 0
+        for X_train_cur, y_train_cur, sl_train_cur in zip(X_train_batches, y_train_batches, sl_train_batches):
+            sess.run(train_step, feed_dict={X: X_train_cur, y: y_train_cur, seq_length: sl_train_cur})
+            # We also need to feed the current sequence length
+        error_train = sess.run(error, {X: X_train, y: y_train, seq_length: seq_len_train})
+        error_valid = sess.run(error, {X: X_val, y: y_val, seq_length: seq_len_val})
 
-    # initialize with the same initial weights
-    if best_training_result is not None:
-        for idx, (W_hid, b_hid) in enumerate(zip(W_hid_list, b_hid_list)):
-            sess.run(tf.assign(W_hid, best_training_result.initial_W_hid_list[idx]))
-            sess.run(tf.assign(b_hid, best_training_result.initial_b_hid_list[idx])) # not necessary since it's the zero vector
-        sess.run(tf.assign(w_out, best_training_result.initial_w_out))
-        sess.run(tf.assign(b_out, best_training_result.initial_b_out)) # not necessary since it's the zero vector
-        early_stopping_epoch_number = best_training_result.early_stopping_epoch_number
+        print('  train:{0:.3g}, valid:{1:.3g}'.format(error_train, error_valid))
 
-    # remember initial parameters
-    initial_W_hid_list, initial_b_hid_list = [], []
-    for W_hid, b_hid in zip(W_hid_list, b_hid_list):
-        initial_W_hid_list += [sess.run(W_hid)]
-        initial_b_hid_list += [sess.run(b_hid)] # not necessary since it's the zero vector
-    initial_w_out = sess.run(w_out)
-    initial_b_out = sess.run(b_out) # not necessary since it's the zero vector
+        error_train_ += [error_train]
+        error_valid_ += [error_valid]
 
-    for iteration_idx in range(n_iter):
-        # Run gradient steps over each minibatch
-        for x_minibatch, labels_minibatch in zip(X_batch_list, labels_batch_list):
-            sess.run(train_step, feed_dict={x_input: x_minibatch, z_: labels_minibatch})
+        if error_train == 0:
+            break
 
-        # Compute the errors over the whole dataset
-        train_loss = sess.run(cross_entropy, feed_dict={x_input: X_train, z_: C_train})
-        test_loss = sess.run(cross_entropy, feed_dict={x_input: X_test, z_: C_test})
+    error_test = sess.run(error, {X: X_test, y: y_test, seq_length: seq_len_test})
+    print('-'*70)
+    print('test error after epoch {0:d}: {1:.3f}'.format(n+1, error_test))
 
-        # Compute the acc over the whole dataset
-        train_acc = sess.run(accuracy, feed_dict={x_input: X_train, z_: C_train})
-        test_acc = sess.run(accuracy, feed_dict={x_input: X_test, z_: C_test})
-        test_missclassification_rate = 1.0 - test_acc
+    sess.close()
 
-        # Put it into the lists
-        test_loss_list.append(test_loss)
-        train_loss_list.append(train_loss)
-        test_acc_list.append(test_acc)
-        train_acc_list.append(train_acc)
+    plt.figure()
 
-        # early stopping check BEGIN
-        if best_training_result is None:
-            if test_missclassification_rate <= early_stopping_val_missclassification_min:
-                early_stopping_epoch_number = iteration_idx + 1
-                early_stopping_val_missclassification_min = test_missclassification_rate
-        else:
-            if iteration_idx == (best_training_result.early_stopping_epoch_number - 1):
-                early_stopping_val_missclassification_min = test_loss
+    plt.plot(np.arange(n+1), error_train_, label='training error')
+    plt.plot(np.arange(n+1), error_valid_, label='validation error')
+    plt.axhline(y=error_test, c='C2', linestyle='--', label='test error')
+    plt.xlabel('epoch')
+    plt.xlim(0, n)
+    plt.legend(loc='best')
+    plt.tight_layout()
 
-        if np.mod(iteration_idx, 10) == 0:
-            print('iteration {} test accuracy: {:.3f}'.format(iteration_idx + 1, test_acc))
-
-    train_result = TrainingResult(
-        early_stopping_epoch_number,
-        early_stopping_val_missclassification_min,
-        initial_W_hid_list,
-        initial_b_hid_list,
-        initial_w_out,
-        initial_b_out,
-        train_loss_list,
-        train_acc_list,
-        test_loss_list,
-        test_acc_list)
-    return train_result
-
-
-def train_and_evaluate_resnet(X_train, C_train, X_test, C_test, learning_rate, n_hidden, n_iter, best_training_result=None):
-    assert(len(list(n_hidden)) == 9, "This network should have 9 hidden layers!")
-    assert(all(map(lambda n: n == 40, list(n_hidden))), "Each hidden layer must have exactly 40 neurons!")
-    n_in = 300
-    n_out = 26
-
-    # Set the variables
-    n_previous = n_in
-    W_hid_list, b_hid_list = [], []
-    for n_current_hidden in n_hidden:
-        W_hid_list += [tf.Variable(rd.randn(n_previous, n_current_hidden) / np.sqrt(n_in), trainable=True)]
-        b_hid_list += [tf.Variable(np.zeros(n_current_hidden), trainable=True)]
-        n_previous = n_current_hidden
-
-    w_out = tf.Variable(rd.randn(n_previous, n_out) / np.sqrt(n_in), trainable=True)
-    b_out = tf.Variable(np.zeros(n_out), trainable=True)
-
-    # Define the neuron operations
-    x_current = x_input = tf.placeholder(shape=(None, n_in), dtype=tf.float64)
-
-    x_prev = None
-    i = 0
-    i_prev = -1
-    n_residual_blocks = 0
-    for W_hid, b_hid in zip(W_hid_list, b_hid_list):
-        if i == 0 or (i % 2) == 1:
-            x_prev = x_current
-            i_prev = i - 1
-            print("Normal hidden layer #{}".format(i))
-            x_current = tf.nn.relu(tf.matmul(x_current, W_hid) + b_hid)
-        else:
-            print("Residual block #{} -> previous layer: {}, layer before previous layer: {}".format(n_residual_blocks, (i-1), i_prev))
-            x_current = tf.nn.relu(x_prev + tf.matmul(x_current, W_hid) + b_hid)
-            n_residual_blocks += 1
-        i += 1
-
-    assert(n_residual_blocks == 4, "There must only be 4 residual blocks in this network!")
-    z_out = tf.matmul(x_current, w_out) + b_out
-    z = tf.nn.softmax(z_out)
-
-    z_ = tf.placeholder(shape=(None, n_out), dtype=tf.float64)
-
-    #cross_entropy = tf.reduce_mean(-tf.reduce_sum(z_ * tf.log(z), reduction_indices=[1]))
-    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=z_out, labels=z_))
-
-    # The operation to perform gradient descent.
-    # Note that train_step is still a **symbolic operation**, it needs to be executed to update the variables.
-    #train_step = tf.train.GradientDescentOptimizer(learning_rate=learning_rate).minimize(cross_entropy)
-    train_step = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cross_entropy)
-
-    # To evaluate the performance in a readable way, we also compute the classification accuracy.
-    correct_prediction = tf.equal(tf.argmax(z, 1), tf.argmax(z_, 1))
-    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float64))
-
-    # Open a session and initialize the variables.
-    init = tf.global_variables_initializer()  # Create an op that will
-    sess = tf.Session()
-    sess.run(init)  # Set the value of the variables to their initialization value
-
-    # Create some list to monitor how error decreases
-    test_loss_list = []
-    train_loss_list = []
-
-    test_acc_list = []
-    train_acc_list = []
-
-    # Create minibatches to train faster
-    k_batch = 20
-    X_batch_list = np.array_split(X_train, k_batch)
-    labels_batch_list = np.array_split(C_train, k_batch)
-
-    # early stopping parameters
-    early_stopping_val_missclassification_min = np.float64(np.inf)
-    early_stopping_epoch_number = 0
-
-    # initialize with the same initial weights
-    if best_training_result is not None:
-        for idx, (W_hid, b_hid) in enumerate(zip(W_hid_list, b_hid_list)):
-            sess.run(tf.assign(W_hid, best_training_result.initial_W_hid_list[idx]))
-            sess.run(tf.assign(b_hid, best_training_result.initial_b_hid_list[idx])) # not necessary since it's the zero vector
-        sess.run(tf.assign(w_out, best_training_result.initial_w_out))
-        sess.run(tf.assign(b_out, best_training_result.initial_b_out)) # not necessary since it's the zero vector
-        early_stopping_epoch_number = best_training_result.early_stopping_epoch_number
-
-    # remember initial parameters
-    initial_W_hid_list, initial_b_hid_list = [], []
-    for W_hid, b_hid in zip(W_hid_list, b_hid_list):
-        initial_W_hid_list += [sess.run(W_hid)]
-        initial_b_hid_list += [sess.run(b_hid)] # not necessary since it's the zero vector
-    initial_w_out = sess.run(w_out)
-    initial_b_out = sess.run(b_out) # not necessary since it's the zero vector
-
-    for iteration_idx in range(n_iter):
-        # Run gradient steps over each minibatch
-        for x_minibatch, labels_minibatch in zip(X_batch_list, labels_batch_list):
-            sess.run(train_step, feed_dict={x_input: x_minibatch, z_: labels_minibatch})
-
-        # Compute the errors over the whole dataset
-        train_loss = sess.run(cross_entropy, feed_dict={x_input: X_train, z_: C_train})
-        test_loss = sess.run(cross_entropy, feed_dict={x_input: X_test, z_: C_test})
-
-        # Compute the acc over the whole dataset
-        train_acc = sess.run(accuracy, feed_dict={x_input: X_train, z_: C_train})
-        test_acc = sess.run(accuracy, feed_dict={x_input: X_test, z_: C_test})
-        test_missclassification_rate = 1.0 - test_acc
-
-        # Put it into the lists
-        test_loss_list.append(test_loss)
-        train_loss_list.append(train_loss)
-        test_acc_list.append(test_acc)
-        train_acc_list.append(train_acc)
-
-        # early stopping check BEGIN
-        if best_training_result is None:
-            if test_missclassification_rate <= early_stopping_val_missclassification_min:
-                early_stopping_epoch_number = iteration_idx + 1
-                early_stopping_val_missclassification_min = test_missclassification_rate
-        else:
-            if iteration_idx == (best_training_result.early_stopping_epoch_number - 1):
-                early_stopping_val_missclassification_min = test_loss
-
-        if np.mod(iteration_idx, 10) == 0:
-            print('iteration {} test accuracy: {:.3f}'.format(iteration_idx + 1, test_acc))
-
-    train_result = TrainingResult(
-        early_stopping_epoch_number,
-        early_stopping_val_missclassification_min,
-        initial_W_hid_list,
-        initial_b_hid_list,
-        initial_w_out,
-        initial_b_out,
-        train_loss_list,
-        train_acc_list,
-        test_loss_list,
-        test_acc_list)
-    return train_result
-
-
-def plot_errors_and_accuracies(title, train_loss_list, train_acc_list, test_loss_list=None,
-                               test_acc_list=None, early_stopping_epoch_number=None):
-    fig, ax_list = plt.subplots(1, 2)
-
-    # loss plot
-    ax_list[0].plot(train_loss_list, color='blue', label='training', lw=2)
-
-    if test_loss_list is not None:
-        ax_list[0].plot(test_loss_list, color='red', label='testing', lw=2)
-
-    # misclassification rate plot
-    train_mcr_list = np.subtract(np.ones(len(train_acc_list), dtype=np.float64), train_acc_list)
-    ax_list[1].plot(train_mcr_list, color='blue', label='training', lw=2)
-
-    if test_acc_list is not None:
-        test_mcr_list = np.subtract(np.ones(len(test_acc_list), dtype=np.float64), test_acc_list)
-        ax_list[1].plot(test_mcr_list, color='red', label='testing', lw=2)
-
-    """
-    # accuracy plot
-    ax_list[1].plot(train_acc_list, color='blue', label='training', lw=2)
-
-    if val_acc_list is not None:
-        ax_list[1].plot(val_acc_list, color='green', label='validation', lw=2)
-
-    if test_acc_list is not None:
-        ax_list[1].plot(test_acc_list, color='red', label='testing', lw=2)
-    """
-
-    ax_list[0].set_xlabel('training iterations')
-    ax_list[1].set_xlabel('training iterations')
-    ax_list[0].set_ylabel('Cross-entropy')
-    ax_list[1].set_ylabel('Misclassification rate')
-    #ax_list[1].set_ylabel('Accuracy')
-
-    # shows vertical line where early stopping occurred...
-    if early_stopping_epoch_number is not None:
-        ax_list[0].axvline(x=(early_stopping_epoch_number - 1))
-        ax_list[1].axvline(x=(early_stopping_epoch_number - 1))
-
-    fig.suptitle(title)
-    plt.legend(loc=2)
-    #plt.subplots_adjust(top=0.85)
     plt.show()
-
-
-def create_one_out_of_k_represantation(C1):
-    C = np.zeros((C1.shape[0], 26))
-    for i in range(C1.shape[0]):
-        reached = False
-        for k in range(0, 26):
-            if k == (C1[i] - 1):
-                C[i][k] = 1
-                reached = True
-        assert reached is True, "WHY!?!? {}".format(C1[i])
-    for one_hot_label_vector in C:
-        assert(np.sum(one_hot_label_vector) == 1.0, "Invalid label vector!")
-    return C
 
 
 if __name__ == "__main__":
