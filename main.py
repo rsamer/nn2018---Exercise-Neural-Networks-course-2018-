@@ -18,118 +18,100 @@ import grammar
 
 
 
-def generate_samples():
+def generate_samples(num_train, num_valid, num_test):
     X = []
     X_str = []
-    y = []
+    Y = []
     seq_lengths = []
+    max_length = 0
     for i in range(6000):
         sample_str = grammar.make_reber()
+        if len(sample_str) > max_length:
+            max_length = len(sample_str)
         sample_input_vec = grammar.str_to_vec(sample_str)
         sample_target_vec = grammar.str_to_next(sample_str)
         temp = grammar.vec_to_str(sample_input_vec)
         assert(temp == sample_str)
         X += [sample_input_vec]
         X_str += [sample_str]
-        y += [sample_target_vec]
+        Y += [sample_target_vec]
         seq_lengths += [sample_input_vec.shape[0]]
 
+    # add padding at the end!
+    new_X, new_Y = [], []
+    for x, y in zip(X, Y):
+        new_x = np.zeros((max_length, len(grammar.SYMS)))
+        new_y = np.zeros((max_length, len(grammar.SYMS)))
+        for i in range(x.shape[0]):
+            new_x[i], new_y[i] = x[i], y[i]
+        new_X += [new_x]
+        new_Y += [new_y]
+
+    X, Y = new_X, new_Y
     X_train, X_val, X_test = X[:5000], X[5000:5500], X[5500:]
-    y_train, y_val, y_test = y[:5000], y[5000:5500], y[5500:]
-    seq_len_train, seq_len_val, seq_len_test = seq_lengths[:5000], seq_lengths[5000:5500], seq_lengths[5500:]
-    assert len(X_train) == 5000
-    assert len(y_train) == 5000
-    assert len(seq_len_train) == 5000
-    assert len(X_val) == 500
-    assert len(y_val) == 500
-    assert len(seq_len_val) == 500
-    assert len(X_test) == 500
-    assert len(y_test) == 500
-    assert len(seq_len_test) == 500
+    y_train, y_val, y_test = Y[:5000], Y[5000:5500], Y[5500:]
+    seq_len_train = seq_lengths[:num_train]
+    seq_len_val = seq_lengths[num_train:(num_train+num_valid)]
+    seq_len_test = seq_lengths[(num_train+num_valid):]
+    assert len(X_train) == num_train
+    assert len(y_train) == num_train
+    assert len(seq_len_train) == num_train
+    assert len(X_val) == num_valid
+    assert len(y_val) == num_valid
+    assert len(seq_len_val) == num_valid
+    assert len(X_test) == num_test
+    assert len(y_test) == num_test
+    assert len(seq_len_test) == num_test
     return X_train, X_val, X_test, y_train, y_val, y_test, seq_len_train, seq_len_val, seq_len_test
 
 
 def main():
-    #tf.reset_default_graph()  # for iPython convenience
-
-    # Give the dimension of the data and chose the number of hidden layer
-    X_train, X_val, X_test, y_train, y_val, y_test, seq_len_train, seq_len_val, seq_len_test = generate_samples()
-    max_sequ_length = max(map(lambda s: s.shape[0], X_train + X_val + X_test))
-    X_train, X_val, X_test = np.array(X_train), np.array(X_val), np.array(X_test)
-    y_train, y_val, y_test = np.array(y_train), np.array(y_val), np.array(y_test)
-    print(max_sequ_length)
+    tf.reset_default_graph()  # for iPython convenience
 
     # ----------------------------------------------------------------------
     # parameters
 
-    #sequence_length = 20
-    num_train, num_valid, num_test = 2000, 500, 500
+    num_train, num_valid, num_test = 5000, 500, 500
 
-    #cell_type = 'simple'
-    #cell_type = 'gru'
-    cell_type = 'lstm'
     num_hidden = 14
 
     batch_size = 40 # TODO: vary this later...
-    learning_rate = 0.01
+    #learning_rate = 0.01
+    #learning_rate = 0.1
+    #learning_rate = 0.5
+    learning_rate = 1
     max_epoch = 200
 
     # ----------------------------------------------------------------------
 
-    """
-    # Generate delayed XOR samples
-    X_train, y_train = generate_data(num_train, sequence_length)
-    sl_train = sequence_length * np.ones(num_train) # NEW
+    X_train, X_val, X_test, y_train, y_val, y_test, seq_len_train, seq_len_val, seq_len_test \
+        = generate_samples(num_train=num_train, num_valid=num_valid, num_test=num_test)
 
-    X_valid, y_valid = generate_data(num_valid, sequence_length)
-    sl_valid = sequence_length * np.ones(num_valid) # NEW
-
-    X_test, y_test = generate_data(num_test, sequence_length)
-    sl_test = sequence_length * np.ones(num_test) # NEW
-
-    # Crop data
-    # Artificially define variable sequence lengths
-    # for demo-purposes
-    for i in range(num_train):
-        ll = 10+random.randint(0,sequence_length-10)
-        sl_train[i] = ll
-
-    for i in range(num_valid):
-        ll = 10+random.randint(0,sequence_length-10)
-        sl_valid[i] = ll
-
-    for i in range(num_test):
-        ll = 10+random.randint(0,sequence_length-10)
-        sl_test[i] = ll
-    """
+    max_sequ_length = max(map(lambda s: s.shape[0], X_train + X_val + X_test))
+    X_train, X_val, X_test = np.array(X_train), np.array(X_val), np.array(X_test)
+    y_train, y_val, y_test = np.array(y_train), np.array(y_val), np.array(y_test)
+    print(max_sequ_length)
 
     # placeholder for the sequence length of the examples
     seq_length = tf.placeholder(tf.int32, [None])
 
     # input tensor shape: number of examples, input length, dimensionality of each input
     # at every time step, one bit is shown to the network
-    X = tf.placeholder(tf.float32, [None, max_sequ_length, 1])
+    X = tf.placeholder(dtype=tf.float32, shape=[None, max_sequ_length, len(grammar.SYMS)])
 
     # output tensor shape: number of examples, dimensionality of each output
     # Binary output at end of sequence
-    y = tf.placeholder(tf.float32, [None, 1])
+    y = tf.placeholder(tf.float32, [None, max_sequ_length, len(grammar.SYMS)])
 
     # define recurrent layer
-    if cell_type == 'simple':
-      cell = tf.nn.rnn_cell.BasicRNNCell(num_hidden)
-      # cell = tf.keras.layers.SimpleRNNCell(num_hidden) #alternative
-    elif cell_type == 'lstm':
-      cell = tf.nn.rnn_cell.LSTMCell(num_hidden)
-    elif cell_type == 'gru':
-      cell = tf.nn.rnn_cell.GRUCell(num_hidden)
-    else:
-      raise ValueError('bad cell type.')
+    lstm_cell = tf.nn.rnn_cell.LSTMCell(num_hidden)
+    cell = tf.contrib.rnn.OutputProjectionWrapper(cell=lstm_cell, output_size=len(grammar.SYMS))
     # Cells are one fully connected recurrent layer with num_hidden neurons
     # Activation function can be defined as second argument.
     # Standard activation function is tanh for BasicRNN and GRU
 
     # only use outputs, ignore states
-    outputs, states = tf.nn.dynamic_rnn(cell, X, dtype=tf.float32, sequence_length=seq_length) # NEW
+    outputs, states = tf.nn.dynamic_rnn(cell, X, dtype=tf.float32, sequence_length=seq_length)
     # tf.nn.dynamic_rnn(cell, inputs, ...)
     # Creates a recurrent neural network specified by RNNCell cell.
     # Performs fully dynamic unrolling of inputs.
@@ -140,19 +122,24 @@ def main():
     last_outputs = outputs[:,-1,:]
 
     # add output neuron
-    y_dim = int(y.shape[1])
-    w = tf.Variable(tf.truncated_normal([num_hidden, y_dim]))
-    b = tf.Variable(tf.constant(.1, shape=[y_dim]))
+    """
+    y_dim = len(grammar.SYMS)
+    w = tf.Variable(tf.truncated_normal([num_hidden, y_dim]), trainable=True)
+    b = tf.Variable(tf.constant(.1, shape=[y_dim]), trainable=True)
 
-    #tf.contrib.rnn.OutputProjectionWrapper()
     y_pred = tf.nn.xw_plus_b(last_outputs, w, b)
+    """
+    #y_pred = tf.matmul(last_outputs, w) + b
     # Matrix multiplication with bias
 
     # define loss, minimizer and error
-    cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(logits=y_pred, labels=y)
-    train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
+    #cross_entropy = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=y_pred, labels=y))
+    cross_entropy = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=outputs, labels=y))
+    #train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
+    train_step = tf.train.GradientDescentOptimizer(learning_rate).minimize(cross_entropy)
 
-    mistakes = tf.not_equal(y, tf.maximum(tf.sign(y_pred), 0))
+    #mistakes = tf.not_equal(y, tf.maximum(tf.sign(y_pred), 0))
+    mistakes = tf.not_equal(y, tf.maximum(tf.sign(outputs), 0))
     error = tf.reduce_mean(tf.cast(mistakes, tf.float32))
 
     sess = tf.Session()
@@ -173,6 +160,7 @@ def main():
         print('training epoch {0:d}'.format(n+1))
 
         for X_train_cur, y_train_cur, sl_train_cur in zip(X_train_batches, y_train_batches, sl_train_batches):
+            #X_train_cur = X_train_cur.reshape((batch_size, sl_train_cur, one_hot_vec_size))
             sess.run(train_step, feed_dict={X: X_train_cur, y: y_train_cur, seq_length: sl_train_cur})
             # We also need to feed the current sequence length
         error_train = sess.run(error, {X: X_train, y: y_train, seq_length: seq_len_train})
