@@ -78,8 +78,8 @@ def main():
     batch_size = 40 # TODO: vary this later...
     #learning_rate = 0.01
     #learning_rate = 0.1
-    #learning_rate = 0.5
-    learning_rate = 1
+    learning_rate = 0.001
+    #learning_rate = 1
     max_epoch = 200
 
     # ----------------------------------------------------------------------
@@ -90,7 +90,6 @@ def main():
     max_sequ_length = max(map(lambda s: s.shape[0], X_train + X_val + X_test))
     X_train, X_val, X_test = np.array(X_train), np.array(X_val), np.array(X_test)
     y_train, y_val, y_test = np.array(y_train), np.array(y_val), np.array(y_test)
-    print(max_sequ_length)
 
     # placeholder for the sequence length of the examples
     seq_length = tf.placeholder(tf.int32, [None])
@@ -135,8 +134,8 @@ def main():
     # define loss, minimizer and error
     #cross_entropy = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=y_pred, labels=y))
     cross_entropy = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=outputs, labels=y))
-    #train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
-    train_step = tf.train.GradientDescentOptimizer(learning_rate).minimize(cross_entropy)
+    train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
+    #train_step = tf.train.GradientDescentOptimizer(learning_rate).minimize(cross_entropy)
 
     #mistakes = tf.not_equal(y, tf.maximum(tf.sign(y_pred), 0))
     mistakes = tf.not_equal(y, tf.maximum(tf.sign(outputs), 0))
