@@ -5,8 +5,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
-import random
-from data_generator import generate_data
 import grammar
 
 
@@ -17,20 +15,25 @@ import grammar
 ########################################################################################################################
 
 
-
 def generate_samples(num_train, num_valid, num_test):
     X = []
     X_str = []
     Y = []
     seq_lengths = []
     max_length = 0
-    for i in range(6000):
-        sample_str = grammar.make_reber()
+    for i in range(num_train + num_valid + num_test):
+        sample_str = grammar.make_embedded_reber()
+        #sample_str = grammar.make_reber()
         if len(sample_str) > max_length:
             max_length = len(sample_str)
+
         sample_input_vec = grammar.str_to_vec(sample_str)
-        sample_target_vec = grammar.str_to_next(sample_str)
+        sample_target_vec = grammar.str_to_next_embed(sample_str)
         temp = grammar.vec_to_str(sample_input_vec)
+        #sample_input_vec = grammar.str_to_vec(sample_str)
+        #sample_target_vec = grammar.str_to_next(sample_str)
+        #temp = grammar.vec_to_str(sample_input_vec)
+
         assert(temp == sample_str)
         X += [sample_input_vec]
         X_str += [sample_str]
@@ -48,8 +51,8 @@ def generate_samples(num_train, num_valid, num_test):
         new_Y += [new_y]
 
     X, Y = new_X, new_Y
-    X_train, X_val, X_test = X[:5000], X[5000:5500], X[5500:]
-    y_train, y_val, y_test = Y[:5000], Y[5000:5500], Y[5500:]
+    X_train, X_val, X_test = X[:num_train], X[num_train:(num_train + num_valid)], X[(num_train + num_valid):]
+    y_train, y_val, y_test = Y[:num_train], Y[num_train:(num_train + num_valid)], Y[(num_train + num_valid):]
     seq_len_train = seq_lengths[:num_train]
     seq_len_val = seq_lengths[num_train:(num_train+num_valid)]
     seq_len_test = seq_lengths[(num_train+num_valid):]
@@ -78,8 +81,8 @@ def main():
     batch_size = 40 # TODO: vary this later...
     #learning_rate = 0.01
     #learning_rate = 0.1
-    learning_rate = 0.001
-    #learning_rate = 1
+    #learning_rate = 0.001
+    learning_rate = 1
     max_epoch = 200
 
     # ----------------------------------------------------------------------
@@ -134,8 +137,8 @@ def main():
     # define loss, minimizer and error
     #cross_entropy = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=y_pred, labels=y))
     cross_entropy = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=outputs, labels=y))
-    train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
-    #train_step = tf.train.GradientDescentOptimizer(learning_rate).minimize(cross_entropy)
+    #train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
+    train_step = tf.train.GradientDescentOptimizer(learning_rate).minimize(cross_entropy)
 
     #mistakes = tf.not_equal(y, tf.maximum(tf.sign(y_pred), 0))
     mistakes = tf.not_equal(y, tf.maximum(tf.sign(outputs), 0))
