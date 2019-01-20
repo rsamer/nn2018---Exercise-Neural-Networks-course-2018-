@@ -78,8 +78,7 @@ def main():
     #learning_rate = 0.001
     #learning_rate = 0.01
     #learning_rate = 0.1
-    #learning_rate = 0.5
-    learning_rate = 1
+    learning_rate = 1.0
     optimizer = "sgd"
     #optimizer = "adam"
     max_epoch = 200
@@ -150,6 +149,7 @@ def main():
     # train
     error_train_ = []
     error_valid_ = []
+    print("Learning rate: {}".format(learning_rate))
 
     for n in range(max_epoch):
         print('training epoch {0:d}'.format(n+1))
