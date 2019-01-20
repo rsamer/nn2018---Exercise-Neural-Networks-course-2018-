@@ -181,6 +181,7 @@ def main():
     plt.xlabel('epoch')
     plt.xlim(0, n)
     plt.legend(loc='best')
+    plt.title("Optimizer: {}, Learning rate: {}".format(optimizer.upper(), learning_rate))
     plt.tight_layout()
     plt.show()
 
