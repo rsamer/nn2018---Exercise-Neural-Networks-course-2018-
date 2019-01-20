@@ -8,31 +8,29 @@ import tensorflow as tf
 import grammar
 
 
-########################################################################################################################
-#
-#          TODO: DO NOT FORGET TO INCLUDE ALL FUNCTIONS FROM grammar.py INTO THIS FILE
-#
-########################################################################################################################
-
-
-def generate_samples(num_train, num_valid, num_test):
+def generate_samples(num_train, num_valid, num_test, use_embedded_grammar=True):
     X = []
     X_str = []
     Y = []
     seq_lengths = []
     max_length = 0
     for i in range(num_train + num_valid + num_test):
-        sample_str = grammar.make_embedded_reber()
-        #sample_str = grammar.make_reber()
+        if use_embedded_grammar:
+            sample_str = grammar.make_embedded_reber()
+        else:
+            sample_str = grammar.make_reber()
+
+        if use_embedded_grammar:
+            sample_input_vec = grammar.str_to_vec(sample_str)
+            sample_target_vec = grammar.str_to_next_embed(sample_str)
+            temp = grammar.vec_to_str(sample_input_vec)
+        else:
+            sample_input_vec = grammar.str_to_vec(sample_str)
+            sample_target_vec = grammar.str_to_next(sample_str)
+            temp = grammar.vec_to_str(sample_input_vec)
+
         if len(sample_str) > max_length:
             max_length = len(sample_str)
-
-        sample_input_vec = grammar.str_to_vec(sample_str)
-        sample_target_vec = grammar.str_to_next_embed(sample_str)
-        temp = grammar.vec_to_str(sample_input_vec)
-        #sample_input_vec = grammar.str_to_vec(sample_str)
-        #sample_target_vec = grammar.str_to_next(sample_str)
-        #temp = grammar.vec_to_str(sample_input_vec)
 
         assert(temp == sample_str)
         X += [sample_input_vec]
@@ -75,20 +73,22 @@ def main():
     # parameters
 
     num_train, num_valid, num_test = 5000, 500, 500
-
     num_hidden = 14
-
-    batch_size = 40 # TODO: vary this later...
+    batch_size = 40
     #learning_rate = 0.01
     #learning_rate = 0.1
     #learning_rate = 0.001
+    optimizer = "sgd"
+    #optimizer = "adam"
     learning_rate = 1
     max_epoch = 200
+    use_embedded_grammar = True  # True = embedded Reber grammar; False = normal Reber grammar
 
     # ----------------------------------------------------------------------
 
     X_train, X_val, X_test, y_train, y_val, y_test, seq_len_train, seq_len_val, seq_len_test \
-        = generate_samples(num_train=num_train, num_valid=num_valid, num_test=num_test)
+        = generate_samples(num_train=num_train, num_valid=num_valid,
+                           num_test=num_test, use_embedded_grammar=use_embedded_grammar)
 
     max_sequ_length = max(map(lambda s: s.shape[0], X_train + X_val + X_test))
     X_train, X_val, X_test = np.array(X_train), np.array(X_val), np.array(X_test)
@@ -120,25 +120,17 @@ def main():
     # Returns:
     # outputs: The RNN output Tensor shaped: [batch_size, max_time, cell.output_size].
 
-    # get the unit outputs at the last time step
-    last_outputs = outputs[:,-1,:]
-
     # add output neuron
-    """
-    y_dim = len(grammar.SYMS)
-    w = tf.Variable(tf.truncated_normal([num_hidden, y_dim]), trainable=True)
-    b = tf.Variable(tf.constant(.1, shape=[y_dim]), trainable=True)
-
-    y_pred = tf.nn.xw_plus_b(last_outputs, w, b)
-    """
-    #y_pred = tf.matmul(last_outputs, w) + b
     # Matrix multiplication with bias
 
     # define loss, minimizer and error
-    #cross_entropy = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=y_pred, labels=y))
     cross_entropy = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=outputs, labels=y))
-    #train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
-    train_step = tf.train.GradientDescentOptimizer(learning_rate).minimize(cross_entropy)
+
+    if optimizer == "sgd":
+        train_step = tf.train.GradientDescentOptimizer(learning_rate).minimize(cross_entropy)
+    else:
+        assert(optimizer == "adam", "Unsupported optimizer '{}'".format(optimizer))
+        train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
 
     #mistakes = tf.not_equal(y, tf.maximum(tf.sign(y_pred), 0))
     mistakes = tf.not_equal(y, tf.maximum(tf.sign(outputs), 0))
@@ -167,7 +159,6 @@ def main():
             # We also need to feed the current sequence length
         error_train = sess.run(error, {X: X_train, y: y_train, seq_length: seq_len_train})
         error_valid = sess.run(error, {X: X_val, y: y_val, seq_length: seq_len_val})
-
         print('  train:{0:.3g}, valid:{1:.3g}'.format(error_train, error_valid))
 
         error_train_ += [error_train]
@@ -183,7 +174,6 @@ def main():
     sess.close()
 
     plt.figure()
-
     plt.plot(np.arange(n+1), error_train_, label='training error')
     plt.plot(np.arange(n+1), error_valid_, label='validation error')
     plt.axhline(y=error_test, c='C2', linestyle='--', label='test error')
@@ -191,7 +181,6 @@ def main():
     plt.xlim(0, n)
     plt.legend(loc='best')
     plt.tight_layout()
-
     plt.show()
 
 
