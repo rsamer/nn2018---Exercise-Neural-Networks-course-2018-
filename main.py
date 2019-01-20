@@ -75,12 +75,13 @@ def main():
     num_train, num_valid, num_test = 5000, 500, 500
     num_hidden = 14
     batch_size = 40
+    #learning_rate = 0.001
     #learning_rate = 0.01
     #learning_rate = 0.1
-    #learning_rate = 0.001
+    #learning_rate = 0.5
+    learning_rate = 1
     optimizer = "sgd"
     #optimizer = "adam"
-    learning_rate = 1
     max_epoch = 200
     use_embedded_grammar = True  # True = embedded Reber grammar; False = normal Reber grammar
 
